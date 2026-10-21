@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Norway RPKI</title>
+<meta name="description" content="Daily status of RPKI route-origin validation (ROA) and ASPA deployment for every Norwegian ASN, with misconfigurations that put routes at risk.">
+<link rel="canonical" href="https://rpki.thorsheim.net/">
+<meta property="og:url" content="https://rpki.thorsheim.net/">
+<meta property="og:title" content="Norway RPKI: ROA & ASPA posture">
+<meta property="og:description" content="Daily RPKI ROA and ASPA status for every Norwegian network, with risky and faulty setups flagged.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ba0c2f'/%3E%3Crect x='9' width='5' height='32' fill='%23fff'/%3E%3Crect y='13.5' width='32' height='5' fill='%23fff'/%3E%3Crect x='10.25' width='2.5' height='32' fill='%2300205b'/%3E%3Crect y='14.75' width='32' height='2.5' fill='%2300205b'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --font-anthropic-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-anthropic-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --color-bg: #faf9f6; --color-panel: #ffffff; --color-fg: #1d1c1a; --color-fg-muted: #6b6862;
+  --color-border-line: #e6e3dc; --color-ok: #1a7f4b; --color-warn: #a35f00; --color-bad: #c0352b;
+  --cds-text-secondary: #6b6862; --cds-border: #e6e3dc; --cds-surface-popover: #ffffff;
+  --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.12);
+  --cds-chart-grid: #eeebe5; --cds-chart-axis: #c9c5bc; --cds-chart-muted: #b9b5ac; --cds-chart-status-critical: #d4584a;
+  --cds-font-size-caption: 0.8125rem; --cds-font-size-body: 0.9375rem; --cds-font-size-heading: 1rem; --cds-font-size-title: 1.875rem;
+  --cds-font-weight-medium: 560;
+  --cds-gap-xs: 4px; --cds-gap-sm: 8px; --cds-gap-md: 16px; --cds-gap-lg: 24px; --cds-gap-xl: 32px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 12px; --cds-pad-lg: 18px; --cds-pad-xl: 28px;
+  --cds-radius: 10px; --cds-dur-slow: .3s;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1a1918; --color-panel: #232220; --color-fg: #ece9e3; --color-fg-muted: #a39f97;
+    --color-border-line: #36332f; --color-ok: #4cc38a; --color-warn: #e6a23c; --color-bad: #f07167;
+    --cds-text-secondary: #a39f97; --cds-border: #36332f; --cds-surface-popover: #2b2a27;
+    --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.5);
+    --cds-chart-grid: #2f2d2a; --cds-chart-axis: #4a4741; --cds-chart-muted: #5d5a54; --cds-chart-status-critical: #e8665a;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-anthropic-sans); }
+#dash-root { max-width: 1280px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 48px; }
+a { color: inherit; }
+.nr-meta { margin: 0 0 var(--cds-gap-sm); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-foot { margin-top: var(--cds-gap-xl); padding-top: var(--cds-gap-md); border-top: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.6; }
+.dash-skeleton { color: transparent !important; background: var(--cds-chart-grid); border-radius: 4px; }
+
+.nr { font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.nr-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0 0 var(--cds-gap-xs); }
+.nr-take { color: var(--color-fg-muted); font-size: var(--cds-font-size-body); margin: 0 0 var(--cds-gap-md); max-width: 60rem; line-height: 1.5; }
+.nr-take b, .nr b { font-weight: 600; }
+.nr-tabs { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); border-bottom: 1px solid var(--color-border-line); margin-bottom: var(--cds-gap-md); }
+.nr-tab { appearance: none; background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--cds-pad-sm) var(--cds-pad-md); font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg-muted); cursor: pointer; }
+.nr-tab[aria-selected="true"] { color: var(--color-fg); border-bottom-color: var(--color-fg); }
+.nr-panel[hidden] { display: none; }
+.nr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: var(--cds-gap-md); margin-bottom: var(--cds-gap-md); }
+.nr-kpi, .nr-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.nr-kpi .lab { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-kpi .val { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; margin: var(--cds-gap-xs) 0; min-height: 1.3em; }
+.nr-kpi .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); margin-bottom: var(--cds-gap-md); }
+.nr-card h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.nr-card .note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: 0 0 var(--cds-gap-md); line-height: 1.45; }
+.nr-full { margin-bottom: var(--cds-gap-md); }
+.nr-stack { display: flex; height: 28px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.nr-stack div { min-width: 2px; }
+.nr-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); margin-top: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); }
+.nr-legend span.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.nr-legend b { font-variant-numeric: tabular-nums; }
+.nr-hbars { display: grid; gap: var(--cds-gap-sm); min-height: 120px; }
+.nr-hrow .t { display: flex; justify-content: space-between; gap: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); margin-bottom: 3px; }
+.nr-hrow .t .n { font-variant-numeric: tabular-nums; color: var(--color-fg-muted); white-space: nowrap; }
+.nr-hrow .track { height: 10px; background: var(--cds-chart-grid); border-radius: 5px; overflow: hidden; }
+.nr-hrow .fill { height: 100%; border-radius: 5px; }
+.nr-sev { display: inline-block; font-size: var(--cds-font-size-caption); font-weight: 600; white-space: nowrap; }
+.nr-sev.High { color: var(--color-bad); } .nr-sev.Medium { color: var(--color-warn); } .nr-sev.Low { color: var(--color-fg-muted); } .nr-sev.Info { color: var(--color-fg-muted); font-weight: 400; }
+.nr-tools { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-sm); }
+.nr-chip { appearance: none; font: inherit; font-size: var(--cds-font-size-caption); border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.nr-chip[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.nr-search { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; }
+.nr-count { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-tbox { max-height: 34rem; overflow: auto; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
+.nr-tbox.short { max-height: none; }
+.nr table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.nr th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); border-bottom: 1px solid var(--color-border-line); padding: 0; white-space: nowrap; z-index: 1; }
+.nr th button { appearance: none; border: 0; background: none; font: inherit; color: var(--color-fg-muted); padding: 8px 10px; cursor: pointer; width: 100%; text-align: inherit; }
+.nr th[aria-sort] button { color: var(--color-fg); }
+.nr th.num, .nr td.num { text-align: right; }
+.nr td { padding: 7px 10px; border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+.nr td.wrap { min-width: 14rem; max-width: 34rem; line-height: 1.4; }
+.nr td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; word-break: break-word; }
+.nr tr:last-child td { border-bottom: 0; }
+.nr-cov { display: flex; align-items: center; gap: 8px; min-width: 8rem; }
+.nr-cov .bar { flex: 1; height: 8px; background: var(--cds-chart-grid); border-radius: 4px; overflow: hidden; }
+.nr-cov .bar i { display: block; height: 100%; border-radius: 4px; }
+.nr-cov span { min-width: 3.2em; text-align: right; }
+.nr-chart { position: relative; min-height: 240px; }
+.nr-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); opacity: 0; white-space: nowrap; z-index: 3; }
+.nr-tip .k { color: var(--cds-text-secondary); }
+.nr-fail { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.nr-fail i { width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); display: inline-block; }
+.nr-method { max-width: 60rem; line-height: 1.55; font-size: var(--cds-font-size-body); }
+.nr-method h3 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: var(--cds-gap-lg) 0 var(--cds-gap-xs); }
+.nr-method ul { padding-left: 1.2rem; margin: var(--cds-gap-xs) 0; }
+.nr-method li { margin-bottom: 6px; }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+</style>
+<script>
+// Minimal runtime: loads the published JSON files and offers the small API the page uses.
+window.dash = (function () {
+  const files = { asns: 'data/no_asns_rpki.json', vrps: 'data/no_vrps.json', aspa: 'data/no_aspa.json',
+                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json' };
+  const state = {}, calcs = {}, subs = [];
+  Object.keys(files).forEach(id => { state[id] = { status: 'loading', data: [] }; });
+  const notify = () => subs.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+  function runCalcs() {
+    Object.entries(calcs).forEach(([id, c]) => {
+      const ins = c.inputs.map(i => state[i] || { status: 'missing' });
+      if (ins.some(s => s.status === 'error')) state[id] = { status: 'error', data: [] };
+      else if (ins.every(s => s.status === 'ok')) {
+        try { state[id] = { status: 'ok', data: c.fn(...ins.map(s => s.data)) }; }
+        catch (e) { console.error(e); state[id] = { status: 'error', data: [] }; }
+      }
+    });
+  }
+  Promise.all(Object.entries(files).map(([id, url]) =>
+    fetch(url, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d => { state[id] = { status: 'ok', data: d }; })
+      .catch(e => { console.error(url, e); state[id] = { status: 'error', data: [] }; })
+  )).then(() => { runCalcs(); notify(); });
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(notify, 150); });
+  return {
+    data: id => state[id] || { status: 'missing', data: [] },
+    onData: f => { subs.push(f); f(); },
+    calc: (id, c) => { calcs[id] = c; state[id] = { status: 'loading', data: [] }; },
+    colors: ['#3b7dd8', '#1f9e74', '#d99a2b', '#8a63d2', '#d4584a', '#3fb6c9', '#c75b9b', '#7f8c4d'],
+    setLink: n => { try { history.replaceState(null, '', '#' + n); } catch (e) {} },
+    refresh() {}, params: () => ({}), setParams() {}, resetParams() {}
+  };
+})();
+</script>
+</head>
+<body>
+<div id="dash-root">
+
+
+<div class="nr">
+  <div class="nr-head">
+    <h1 id="title">Norway RPKI: ROA &amp; ASPA posture</h1>
+    <p class="nr-meta" id="meta-line">&nbsp;</p>
+    <p class="nr-take" id="takeaway">
+      Every announcement from <span data-source="kpi" data-field="full" data-row="0" class="dash-skeleton">—</span> of
+      <span data-source="kpi" data-field="routed" data-row="0" class="dash-skeleton">—</span> routed Norwegian ASNs is RPKI-valid, while
+      <span data-source="kpi" data-field="none" data-row="0" class="dash-skeleton">—</span> have no valid route at all.
+      Only <span data-source="kpi" data-field="aspa_routed" data-row="0" class="dash-skeleton">—</span> routed ASNs publish ASPA.
+      <b><span data-source="kpi" data-field="high" data-row="0" class="dash-skeleton">—</span> high-severity findings</b> need attention first, including
+      <span data-source="kpi" data-field="invalid" data-row="0" class="dash-skeleton">—</span> RPKI-invalid route(s).
+    </p>
+  </div>
+
+  <div class="nr-tabs" role="tablist">
+    <button class="nr-tab" role="tab" aria-selected="true" data-tab="overview" id="tab-overview">Overview</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="findings" id="tab-findings">Findings</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="aspa" id="tab-aspa">ASPA</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="asns" id="tab-asns">All ASNs</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="method" id="tab-method">Method &amp; caveats</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="nr-panel" data-panel="overview" id="overview">
+    <div class="nr-kpis">
+      <div class="nr-kpi"><div class="lab">Routed NO ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered</div></div>
+      <div class="nr-kpi"><div class="lab">All routes valid</div><div class="val" data-source="kpi" data-field="full_share" data-row="0">—</div><div class="sub">share of routed ASNs</div></div>
+      <div class="nr-kpi"><div class="lab">IPv4 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v4_cov" data-row="0">—</div><div class="sub">of announced Norwegian IPv4</div></div>
+      <div class="nr-kpi"><div class="lab">IPv6 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v6_cov" data-row="0">—</div><div class="sub">of announced Norwegian IPv6</div></div>
+      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
+      <div class="nr-kpi"><div class="lab">High-severity findings</div><div class="val" data-source="kpi" data-field="high" data-row="0">—</div><div class="sub"><span data-source="kpi" data-field="invalid" data-row="0">—</span> invalid route(s) · <span data-source="kpi" data-field="medium" data-row="0">—</span> medium</div></div>
+    </div>
+
+    <div class="nr-card nr-full" id="trend-card">
+      <h2>Trend</h2>
+      <p class="note">Daily snapshots: share of routed ASNs whose every route is valid, and share of announced IPv4 and IPv6 space that is RPKI-valid.</p>
+      <div data-source="history" id="trend-chart" class="nr-chart" style="min-height:200px"></div>
+    </div>
+
+    <div class="nr-grid">
+      <div class="nr-card" id="status-card">
+        <h2>Route-origin validity of routed ASNs</h2>
+        <p class="note">Each announcement seen by RIPE RIS was validated against the full global ROA set. All valid: every route validates. Partly valid: some routes are NotFound or Invalid. None valid: nothing protected.</p>
+        <div data-source="status_mix" id="status-chart" style="min-height:72px"></div>
+      </div>
+      <div class="nr-card" id="ca-card">
+        <h2>Where ROAs are published</h2>
+        <p class="note">ASNs with ROAs, by certificate authority model. Delegated CAs run their own CA and publication; an outage there makes ROAs disappear.</p>
+        <div data-source="ca_mix" id="ca-chart" class="nr-hbars"></div>
+      </div>
+    </div>
+
+    <div class="nr-grid">
+      <div class="nr-card" id="cat-card">
+        <h2>Findings by type</h2>
+        <p class="note">One finding per ASN and issue type. Colour shows severity.</p>
+        <div data-source="cat_mix" id="cat-chart" class="nr-hbars"></div>
+      </div>
+      <div class="nr-card" id="maxlen-card">
+        <h2>How far maxLength reaches past the prefix</h2>
+        <p class="note">Every ROA prefix (VRP) for Norwegian ASNs. Anything beyond “exact” permits more-specifics; unannounced ones can be hijacked with a forged origin and still validate (RFC 9319).</p>
+        <div data-source="maxlen_dist" id="maxlen-chart" class="nr-chart"></div>
+      </div>
+    </div>
+
+    <div class="nr-card nr-full" id="top-card">
+      <h2>Largest Norwegian networks</h2>
+      <p class="note">Top 20 by announced IPv4 space (counted in /24s). Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid.</p>
+      <div class="nr-tbox short">
+        <table data-source="asns" data-row-key="asn" id="top-table">
+          <thead><tr>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="v4_24s" class="num"><button>IPv4 /24s</button></th>
+            <th data-field="roa_status"><button>ROA status</button></th>
+            <th data-field="cov_v4_pct"><button>IPv4 space valid</button></th>
+            <th data-field="valid_pct"><button>Routes valid</button></th>
+            <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
+            <th data-field="aspa"><button>ASPA</button></th>
+            <th data-field="high" class="num"><button>High</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINDINGS -->
+  <section class="nr-panel" data-panel="findings" id="findings" hidden>
+    <div class="nr-card nr-full">
+      <h2>All findings</h2>
+      <p class="note">Sorted by severity, then by the size of the network. Route validity uses exact announcements seen by RIPE RIS and the full validated ROA set.</p>
+      <div class="nr-tools">
+        <div id="sev-chips" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="nr-chip" aria-pressed="true" data-sev="">All</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="High">High</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Medium">Medium</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Low">Low</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Info">Info</button>
+        </div>
+        <input class="nr-search" id="find-search" type="search" placeholder="Search ASN, name, prefix…">
+        <span class="nr-count" id="find-count"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="findings" data-row-key="id" id="find-table">
+          <thead><tr>
+            <th data-field="severity"><button>Severity</button></th>
+            <th data-field="category"><button>Issue</button></th>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="objects"><button>Objects</button></th>
+            <th data-field="detail"><button>Why it matters</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASPA -->
+  <section class="nr-panel" data-panel="aspa" id="aspa" hidden>
+    <div class="nr-card nr-full">
+      <h2>ASPA records for Norwegian ASNs</h2>
+      <p class="note">Each row is a customer AS and the providers it authorises, next to the neighbours RIPE RIS sees on its upstream side (with how many RIS peers see each link). An unlisted neighbour is harmless if it is a peer; an unlisted transit provider makes routes fail ASPA checks. Listed providers never seen may be backup links or stale entries.</p>
+      <div class="nr-tools"><input class="nr-search" id="aspa-search" type="search" placeholder="Search ASN, name, provider…"><span class="nr-count" id="aspa-count"></span></div>
+      <div class="nr-tbox">
+        <table data-source="aspa" data-row-key="customer" id="aspa-table">
+          <thead><tr>
+            <th data-field="customer"><button>Customer AS</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="routed"><button>Routed</button></th>
+            <th data-field="providers"><button>Authorised providers</button></th>
+            <th data-field="provider_count" class="num"><button>Providers</button></th>
+            <th data-field="neighbours_seen"><button>Seen upstream-side (RIS peers)</button></th>
+            <th data-field="unlisted_neighbours"><button>Seen, not listed</button></th>
+            <th data-field="unobserved_providers"><button>Listed, not seen</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALL ASNS -->
+  <section class="nr-panel" data-panel="asns" id="asns" hidden>
+    <div class="nr-card nr-full">
+      <h2>Every Norwegian-registered ASN</h2>
+      <p class="note">Click a column to sort. Unrouted ASNs had no announcement seen by at least 10 RIS peers. Upstream-side neighbours are what an ASPA for that AS would likely need to list.</p>
+      <div class="nr-tools"><input class="nr-search" id="asn-search" type="search" placeholder="Search ASN or name…"><span class="nr-count" id="asn-count"></span></div>
+      <div class="nr-tbox">
+        <table data-source="asns" data-row-key="asn" id="asn-table">
+          <thead><tr>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="routed"><button>Routed</button></th>
+            <th data-field="roa_status"><button>ROA status</button></th>
+            <th data-field="prefixes_v4" class="num"><button>v4 pfx</button></th>
+            <th data-field="prefixes_v6" class="num"><button>v6 pfx</button></th>
+            <th data-field="valid" class="num"><button>Valid</button></th>
+            <th data-field="notfound" class="num"><button>NotFound</button></th>
+            <th data-field="invalid" class="num"><button>Invalid</button></th>
+            <th data-field="valid_pct"><button>Routes valid</button></th>
+            <th data-field="vrps" class="num"><button>VRPs</button></th>
+            <th data-field="vrps_prev" class="num"><button>VRPs 14 Oct</button></th>
+            <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
+            <th data-field="loose_maxlen_v4" class="num"><button>Loose maxLen</button></th>
+            <th data-field="unannounced_vrps" class="num"><button>Unannounced VRPs</button></th>
+            <th data-field="aspa_providers"><button>ASPA providers</button></th>
+            <th data-field="upstreams_seen"><button>Upstream-side neighbours</button></th>
+            <th data-field="ca_model"><button>CA model</button></th>
+            <th data-field="high" class="num"><button>High</button></th>
+            <th data-field="medium" class="num"><button>Med</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- METHOD -->
+  <section class="nr-panel" data-panel="method" id="method" hidden>
+    <div class="nr-method">
+      <h3>Where the data comes from</h3>
+      <ul>
+        <li><b>Which ASNs are Norwegian:</b> ASNs delegated to Norway by RIPE NCC (RIPEstat country resource list), plus ASNs whose registry country is NO in the ipverse <i>asn-info</i> dataset.</li>
+        <li><b>What each AS announces:</b> exact prefixes from RIPEstat <i>announced-prefixes</i> (RIPE RIS), counting only routes seen by at least 10 RIS peers during the last day.</li>
+        <li><b>ROAs and ASPAs:</b> the complete validated output (<i>rpki.json</i>) of the rpki-client console, covering all five RIR trust anchors. The time of the build is in Sources.</li>
+        <li><b>Upstream-side neighbours:</b> RIPEstat <i>asn-neighbours</i> (left neighbours in RIS AS paths), with the number of RIS peers that see each link.</li>
+        <li><b>Where ROAs are published:</b> the repository hosts listed on each ASN's rpki-client console page.</li>
+      </ul>
+      <h3>How the checks work</h3>
+      <ul>
+        <li><b>Route validity:</b> each announcement is validated per RFC 6811 against every VRP worldwide: Valid, Invalid (wrong origin AS, or longer than maxLength) or NotFound.</li>
+        <li><b>maxLength:</b> a ROA is flagged when maxLength is longer than the prefix <i>and</i> more-specifics in that range are not all announced. “Wide” is IPv4 4+ bits, “loose” 1–3 bits; IPv6 from 16 bits.</li>
+        <li><b>Unannounced ROAs:</b> ROA prefixes with no announcement from that AS inside or around them. When another Norwegian AS announces the space, it is flagged as a likely migration leftover.</li>
+        <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
+      </ul>
+      <h3>What this does not show</h3>
+      <ul>
+        <li>Routes seen by fewer than 10 RIS peers, or only inside Norway.</li>
+        <li>Whether Norwegian networks drop invalid routes (ROV enforcement).</li>
+        <li>AS0 ROAs and ROA expiry dates.</li>
+        <li>Norwegian networks that use an ASN registered in another country.</li>
+      </ul>
+    </div>
+  </section>
+  <footer class="nr-foot">
+    Data: <a href="https://console.rpki-client.org/">rpki-client console</a> (validated ROAs and ASPAs, all RIRs) ·
+    <a href="https://stat.ripe.net/">RIPEstat</a> / RIPE RIS (announcements, neighbours) ·
+    <a href="https://github.com/ipverse/asn-info">ipverse asn-info</a>.
+    Source code: <a href="https://github.com/thorsheim/norway-rpki">github.com/thorsheim/norway-rpki</a>. Raw data: <a href="data/no_asns_rpki.json">ASNs</a>, <a href="data/no_findings.json">findings</a>, <a href="data/no_vrps.json">VRPs</a>, <a href="data/no_aspa.json">ASPA</a>, <a href="data/history.json">history</a>.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const fmt = d3.format(',');
+  const pct = (v) => (v == null || isNaN(v)) ? '—' : (Math.round(v * 10) / 10) + '%';
+  const SEV_RANK = { High: 0, Medium: 1, Low: 2, Info: 3 };
+  const sevColor = (s) => s === 'High' ? 'var(--cds-chart-status-critical)' : s === 'Medium' ? dash.colors[2] : s === 'Low' ? dash.colors[0] : 'var(--cds-chart-muted)';
+
+  // ---------- calculations ----------
+  dash.calc('kpi', {
+    inputs: ['asns', 'findings'],
+    title: 'Headline figures',
+    description: 'Counts of routed ASNs by ROA status, address-space coverage, ASPA adoption and findings by severity.',
+    fn: (asns, findings) => {
+      const routed = asns.filter(r => r.routed === 'yes');
+      const full = routed.filter(r => r.roa_status === 'All valid').length;
+      const sum = (k) => routed.reduce((t, r) => t + (r[k] || 0), 0);
+      const v4 = sum('v4_24s'), v4c = sum('v4_valid_24s'), v6 = sum('v6_48s'), v6c = sum('v6_valid_48s');
+      return [{
+        registered: asns.length,
+        routed: routed.length,
+        full,
+        partial: routed.filter(r => r.roa_status === 'Partly valid').length,
+        none: routed.filter(r => r.roa_status === 'None valid').length,
+        invalid: sum('invalid'),
+        full_share: Math.round(1000 * full / routed.length) / 10,
+        v4_cov: Math.round(1000 * v4c / v4) / 10,
+        v6_cov: Math.round(1000 * v6c / v6) / 10,
+        aspa_all: asns.filter(r => r.aspa === 'yes').length,
+        aspa_routed: routed.filter(r => r.aspa === 'yes').length,
+        high: findings.filter(f => f.severity === 'High').length,
+        medium: findings.filter(f => f.severity === 'Medium').length
+      }];
+    }
+  });
+  dash.calc('status_mix', {
+    inputs: ['asns'],
+    title: 'Routed ASNs by route validity',
+    description: 'Routed Norwegian ASNs counted by whether all, some or none of their announcements validate as RPKI-valid.',
+    fn: (asns) => {
+      const routed = asns.filter(r => r.routed === 'yes');
+      return ['All valid', 'Partly valid', 'None valid'].map(s => ({ status: s, n: routed.filter(r => r.roa_status === s).length }));
+    }
+  });
+  dash.calc('ca_mix', {
+    inputs: ['asns'],
+    title: 'ASNs by CA model',
+    description: 'ASNs with current ROAs, grouped by where their ROAs are published.',
+    fn: (asns) => {
+      const m = {};
+      asns.filter(r => r.vrps > 0).forEach(r => { m[r.ca_model] = (m[r.ca_model] || 0) + 1; });
+      return Object.keys(m).map(ca_model => ({ ca_model, n: m[ca_model] })).sort((a, b) => b.n - a.n);
+    }
+  });
+  dash.calc('cat_mix', {
+    inputs: ['findings'],
+    title: 'Findings by type',
+    description: 'Number of findings per issue type and severity.',
+    fn: (findings) => {
+      const rank = { High: 0, Medium: 1, Low: 2, Info: 3 };
+      const m = {};
+      findings.forEach(f => { const k = f.category + '\u0000' + f.severity; m[k] = (m[k] || 0) + 1; });
+      const rows = Object.keys(m).map(k => { const [category, severity] = k.split('\u0000'); return { category, severity, n: m[k] }; });
+      return rows.sort((a, b) => rank[a.severity] - rank[b.severity] || b.n - a.n);
+    }
+  });
+  dash.calc('maxlen_dist', {
+    inputs: ['vrps'],
+    title: 'maxLength reach',
+    description: 'VRPs counted by how many bits maxLength extends past the prefix length, per address family.',
+    fn: (vrps) => {
+      const buckets = ['exact', '+1–3', '+4–7', '+8–15', '+16+'];
+      const b = (s) => s === 0 ? 'exact' : s <= 3 ? '+1–3' : s <= 7 ? '+4–7' : s <= 15 ? '+8–15' : '+16+';
+      const rows = [];
+      ['IPv4', 'IPv6'].forEach(afi => buckets.forEach(k => rows.push({ afi, bucket: k, n: vrps.filter(v => v.afi === afi && b(v.spread) === k).length })));
+      return rows;
+    }
+  });
+
+  // ---------- helpers ----------
+  const fail = (el) => { el.innerHTML = ''; const d = document.createElement('div'); d.className = 'nr-fail'; const i = document.createElement('i'); d.appendChild(i); d.appendChild(document.createTextNode('Failed to load')); el.appendChild(d); };
+  const state = (id) => dash.data(id);
+  const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); };
+  function covCell(td, v, color) {
+    const w = document.createElement('div'); w.className = 'nr-cov';
+    const bar = document.createElement('div'); bar.className = 'bar';
+    const i = document.createElement('i'); i.style.width = (v == null ? 0 : Math.max(0, Math.min(100, v))) + '%';
+    i.style.background = v == null ? 'transparent' : v >= 100 ? 'var(--color-ok)' : v > 0 ? dash.colors[2] : 'var(--cds-chart-status-critical)';
+    bar.appendChild(i); w.appendChild(bar);
+    const s = document.createElement('span'); s.textContent = v == null ? '—' : pct(v); w.appendChild(s);
+    td.appendChild(w);
+  }
+
+  // Generic sortable/searchable table
+  const tables = {};
+  function setupTable(id, opts) {
+    const t = document.getElementById(id);
+    const st = { key: opts.sortKey, dir: opts.sortDir || 'desc', q: '', filter: null };
+    tables[id] = st;
+    t.querySelectorAll('th').forEach(th => {
+      th.querySelector('button').addEventListener('click', () => {
+        const f = th.dataset.field;
+        if (st.key === f) st.dir = st.dir === 'asc' ? 'desc' : 'asc'; else { st.key = f; st.dir = opts.numeric && opts.numeric.includes(f) ? 'desc' : 'asc'; }
+        render();
+      });
+    });
+    if (opts.search) document.getElementById(opts.search).addEventListener('input', (e) => { st.q = e.target.value.trim().toLowerCase(); render(); });
+    return st;
+  }
+  function drawTable(id, rows, cols, opts) {
+    const t = document.getElementById(id); const st = tables[id]; const tb = t.querySelector('tbody'); clear(tb);
+    t.querySelectorAll('th').forEach(th => { if (th.dataset.field === st.key) th.setAttribute('aria-sort', st.dir === 'asc' ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort'); });
+    let r = rows.slice();
+    if (st.filter) r = r.filter(st.filter);
+    if (st.q) r = r.filter(x => cols.some(c => String(x[c.f] ?? '').toLowerCase().includes(st.q)) || ('as' + x[opts.key]).includes(st.q));
+    const sorter = opts.sorter ? opts.sorter(st) : null;
+    r.sort(sorter || ((a, b) => {
+      const va = a[st.key], vb = b[st.key];
+      const c = (typeof va === 'number' || typeof vb === 'number') ? ((va ?? -1) - (vb ?? -1)) : String(va ?? '').localeCompare(String(vb ?? ''));
+      return st.dir === 'asc' ? c : -c;
+    }));
+    if (opts.limit) r = r.slice(0, opts.limit);
+    r.forEach(x => {
+      const tr = document.createElement('tr'); tr.dataset.key = String(x[opts.key]);
+      cols.forEach(c => {
+        const td = document.createElement('td'); if (c.cls) td.className = c.cls;
+        if (c.render) c.render(td, x); else td.textContent = x[c.f] == null ? '' : String(x[c.f]);
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    if (opts.count) document.getElementById(opts.count).textContent = r.length === rows.length ? `${fmt(rows.length)} rows` : `${fmt(r.length)} of ${fmt(rows.length)} rows`;
+  }
+  const asCell = (f) => (td, x) => { td.textContent = 'AS' + x[f]; };
+  const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
+  const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
+
+  setupTable('top-table', { sortKey: 'v4_24s', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn'] });
+  setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
+  setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
+  setupTable('asn-table', { sortKey: 'asn', sortDir: 'asc', search: 'asn-search', numeric: ['asn', 'prefixes_v4', 'prefixes_v6', 'valid', 'notfound', 'invalid', 'valid_pct', 'vrps', 'vrps_prev', 'wide_maxlen_v4', 'loose_maxlen_v4', 'unannounced_vrps', 'high', 'medium'] });
+
+  document.querySelectorAll('#sev-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#sev-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    const s = b.dataset.sev; tables['find-table'].filter = s ? (x => x.severity === s) : null; render();
+  }));
+
+  // Tabs
+  function showTab(name, push) {
+    document.querySelectorAll('.nr-tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+    document.querySelectorAll('.nr-panel').forEach(p => { p.hidden = p.dataset.panel !== name; });
+    if (push) dash.setLink(name);
+    render();
+  }
+  document.querySelectorAll('.nr-tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab, true)));
+
+  // ---------- renderers ----------
+  function renderKpi() {
+    const k = state('kpi');
+    document.querySelectorAll('[data-source="kpi"]').forEach(el => {
+      if (k.status === 'ok' && k.data && k.data[0]) {
+        const v = k.data[0][el.dataset.field];
+        const f = el.dataset.field;
+        el.textContent = (f === 'full_share' || f === 'v4_cov' || f === 'v6_cov') ? pct(v) : fmt(v);
+        el.classList.remove('dash-skeleton');
+      } else if (k.status === 'error') { el.textContent = '—'; el.classList.remove('dash-skeleton'); }
+      else el.textContent = '—';
+    });
+  }
+
+  function renderStatus() {
+    const el = document.getElementById('status-chart'); const s = state('status_mix');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const rows = s.data; const tot = d3.sum(rows, r => r.n);
+    const colors = { 'All valid': 'var(--color-ok)', 'Partly valid': dash.colors[2], 'None valid': 'var(--cds-chart-status-critical)' };
+    const bar = document.createElement('div'); bar.className = 'nr-stack';
+    rows.forEach(r => { const d = document.createElement('div'); d.style.flex = String(r.n); d.style.background = colors[r.status]; d.title = ''; bar.appendChild(d); });
+    el.appendChild(bar);
+    const lg = document.createElement('div'); lg.className = 'nr-legend';
+    rows.forEach(r => {
+      const it = document.createElement('div');
+      const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = colors[r.status]; it.appendChild(sw);
+      it.appendChild(document.createTextNode(r.status + ' '));
+      const b = document.createElement('b'); b.textContent = fmt(r.n); it.appendChild(b);
+      const sp = document.createElement('span'); sp.style.color = 'var(--color-fg-muted)'; sp.textContent = ' · ' + d3.format('.0%')(r.n / tot); it.appendChild(sp);
+      lg.appendChild(it);
+    });
+    el.appendChild(lg);
+  }
+
+  function hbars(elId, srcId, label, color) {
+    const el = document.getElementById(elId); const s = state(srcId);
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const max = d3.max(s.data, r => r.n) || 1;
+    s.data.forEach(r => {
+      const row = document.createElement('div'); row.className = 'nr-hrow';
+      const t = document.createElement('div'); t.className = 't';
+      const a = document.createElement('span'); a.textContent = label(r); t.appendChild(a);
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = fmt(r.n); t.appendChild(n);
+      row.appendChild(t);
+      const tr = document.createElement('div'); tr.className = 'track';
+      const f = document.createElement('div'); f.className = 'fill'; f.style.width = (100 * r.n / max) + '%'; f.style.background = color(r); tr.appendChild(f);
+      row.appendChild(tr); el.appendChild(row);
+    });
+  }
+
+  function renderMaxlen() {
+    const el = document.getElementById('maxlen-chart'); const s = state('maxlen_dist');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const W = el.clientWidth; if (!W) return;
+    const H = 240; const m = { t: 28, r: 8, b: 26, l: 8 };
+    const buckets = Array.from(new Set(s.data.map(d => d.bucket)));
+    const afis = ['IPv4', 'IPv6'];
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const y = d3.scaleLinear([0, d3.max(s.data, d => d.n) || 1], [H - m.b, m.t]).nice();
+    // left margin from widest tick
+    const tmp = svg.append('g').attr('font-size', 'var(--cds-font-size-caption)');
+    const ticks = y.ticks(4); let lw = 0;
+    ticks.forEach(t => { const tx = tmp.append('text').text(fmt(t)); lw = Math.max(lw, tx.node().getComputedTextLength()); });
+    tmp.remove(); m.l = lw + 12;
+    const x0 = d3.scaleBand(buckets, [m.l, W - m.r]).paddingInner(0.25).paddingOuter(0.1);
+    const x1 = d3.scaleBand(afis, [0, x0.bandwidth()]).padding(0.12);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmt(d));
+    const tip = d3.select(el).append('div').attr('class', 'nr-tip');
+    const g = svg.append('g');
+    g.selectAll('rect').data(s.data).join('rect')
+      .attr('x', d => x0(d.bucket) + x1(d.afi)).attr('width', Math.min(32, x1.bandwidth()))
+      .attr('y', d => y(d.n)).attr('height', d => Math.max(0, y(0) - y(d.n))).attr('rx', 4)
+      .attr('fill', d => d.afi === 'IPv4' ? dash.colors[0] : dash.colors[1])
+      .on('mousemove', function (ev, d) {
+        const [px, py] = d3.pointer(ev, el);
+        tip.html(''); tip.append('div').attr('class', 'k').text(`${d.afi} · maxLength ${d.bucket}`);
+        tip.append('div').text(`${fmt(d.n)} VRPs`);
+        const tw = tip.node().offsetWidth; const left = Math.min(Math.max(0, px + 12), W - tw);
+        tip.style('left', left + 'px').style('top', Math.max(0, py - 40) + 'px').style('opacity', 1);
+        d3.select(this).attr('opacity', 0.8);
+      })
+      .on('mouseleave', function () { tip.style('opacity', 0); d3.select(this).attr('opacity', 1); });
+    svg.append('g').selectAll('text').data(buckets).join('text').attr('x', d => x0(d) + x0.bandwidth() / 2).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d);
+    // legend
+    const lg = svg.append('g').attr('transform', `translate(${m.l},12)`).attr('font-size', 'var(--cds-font-size-caption)');
+    let off = 0;
+    afis.forEach((a, i) => { const gi = lg.append('g').attr('transform', `translate(${off},0)`); gi.append('rect').attr('width', 10).attr('height', 10).attr('y', -8).attr('rx', 3).attr('fill', dash.colors[i]); const tx = gi.append('text').attr('x', 15).attr('fill', 'var(--color-fg)').text(a); off += 15 + tx.node().getComputedTextLength() + 16; });
+  }
+
+  function renderTop() {
+    const s = state('asns'); const t = document.getElementById('top-table');
+    if (s.status !== 'ok') { clear(t.querySelector('tbody')); return; }
+    drawTable('top-table', s.data.filter(r => r.routed === 'yes'), [
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numCell('v4_24s') }, { f: 'roa_status' },
+      { f: 'cov_v4_pct', render: (td, x) => covCell(td, x.cov_v4_pct) }, { f: 'valid_pct', render: (td, x) => covCell(td, x.valid_pct) },
+      { f: 'wide_maxlen_v4', cls: 'num', render: numCell('wide_maxlen_v4') }, { f: 'aspa' }, { f: 'high', cls: 'num', render: numCell('high') }
+    ], { key: 'asn', limit: 20 });
+  }
+
+  function renderFindings() {
+    const s = state('findings'); if (s.status !== 'ok') return;
+    const st = tables['find-table'];
+    drawTable('find-table', s.data, [
+      { f: 'severity', render: sevCell }, { f: 'category' }, { f: 'asn', render: asCell('asn') }, { f: 'name' },
+      { f: 'objects', cls: 'wrap mono' }, { f: 'detail', cls: 'wrap' }
+    ], { key: 'id', count: 'find-count', sorter: (st) => st.key === 'severity' ? ((a, b) => { const c = SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.v4_24s - a.v4_24s || a.asn - b.asn; return st.dir === 'asc' ? c : -c; }) : null });
+  }
+
+  function renderAspa() {
+    const s = state('aspa'); if (s.status !== 'ok') return;
+    drawTable('aspa-table', s.data, [
+      { f: 'customer', render: asCell('customer') }, { f: 'name' }, { f: 'routed' }, { f: 'providers', cls: 'wrap' },
+      { f: 'provider_count', cls: 'num' }, { f: 'neighbours_seen', cls: 'wrap' },
+      { f: 'unlisted_neighbours', render: (td, x) => { td.textContent = x.unlisted_neighbours; if (x.unlisted_neighbours) td.style.color = 'var(--color-warn)'; } },
+      { f: 'unobserved_providers' }
+    ], { key: 'customer', count: 'aspa-count' });
+  }
+
+  function renderAsns() {
+    const s = state('asns'); if (s.status !== 'ok') return;
+    drawTable('asn-table', s.data, [
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'routed' }, { f: 'roa_status' },
+      { f: 'prefixes_v4', cls: 'num' }, { f: 'prefixes_v6', cls: 'num' },
+      { f: 'valid', cls: 'num' }, { f: 'notfound', cls: 'num' }, { f: 'invalid', cls: 'num', render: (td, x) => { td.textContent = String(x.invalid); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
+      { f: 'valid_pct', render: (td, x) => covCell(td, x.valid_pct) },
+      { f: 'vrps', cls: 'num' }, { f: 'vrps_prev', cls: 'num' }, { f: 'wide_maxlen_v4', cls: 'num' }, { f: 'loose_maxlen_v4', cls: 'num' }, { f: 'unannounced_vrps', cls: 'num' },
+      { f: 'aspa_providers', cls: 'wrap' }, { f: 'upstreams_seen', cls: 'wrap' }, { f: 'ca_model' }, { f: 'high', cls: 'num' }, { f: 'medium', cls: 'num' }
+    ], { key: 'asn', count: 'asn-count' });
+  }
+
+  function render() {
+    renderKpi(); renderMeta();
+    const cur = (document.querySelector('.nr-tab[aria-selected="true"]') || {}).dataset?.tab || 'overview';
+    if (cur === 'overview') {
+      renderTrend();
+      renderStatus();
+      hbars('ca-chart', 'ca_mix', r => r.ca_model, (r) => r.ca_model === 'RIPE NCC hosted' ? dash.colors[0] : r.ca_model.startsWith('Delegated') ? dash.colors[3] : dash.colors[1]);
+      hbars('cat-chart', 'cat_mix', r => `${r.category} · ${r.severity}`, r => sevColor(r.severity));
+      renderMaxlen();
+      renderTop();
+    }
+    if (cur === 'findings') renderFindings();
+    if (cur === 'aspa') renderAspa();
+    if (cur === 'asns') renderAsns();
+  }
+
+  function renderTrend() {
+    const el = document.getElementById('trend-chart'); const s = state('history');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const W = el.clientWidth; if (!W) return;
+    el.style.minHeight = '200px';
+    const rows = s.data.map(d => ({ date: new Date(d.date + 'T00:00:00Z'), all: 100 * d.all_valid / d.routed, v4: d.v4_valid_pct, v6: d.v6_valid_pct }));
+    if (rows.length < 2) {
+      el.style.minHeight = '56px'; const p = document.createElement('div'); p.className = 'nr-fail';
+      p.textContent = 'The trend line appears after the second daily update.'; el.appendChild(p); return;
+    }
+    const series = [['all', 'All routes valid (share of ASNs)'], ['v4', 'IPv4 space valid'], ['v6', 'IPv6 space valid']];
+    const H = 200, m = { t: 30, r: 12, b: 24, l: 40 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const x = d3.scaleUtc(d3.extent(rows, d => d.date), [m.l, W - m.r]);
+    const lo = Math.max(0, Math.floor((d3.min(rows, d => Math.min(d.all, d.v4, d.v6)) - 5) / 10) * 10);
+    const y = d3.scaleLinear([lo, 100], [H - m.b, m.t]);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d + '%');
+    const xt = x.ticks(Math.max(2, Math.floor(W / 110)));
+    svg.append('g').selectAll('text').data(xt).join('text').attr('x', d => x(d)).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d3.utcFormat('%b %-d')(d));
+    series.forEach(([k], i) => {
+      svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', dash.colors[i]).attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round')
+        .attr('d', d3.line().x(d => x(d.date)).y(d => y(d[k])));
+    });
+    const lg = svg.append('g').attr('transform', `translate(${m.l},12)`).attr('font-size', 'var(--cds-font-size-caption)');
+    let off = 0;
+    series.forEach(([k, label], i) => { const g = lg.append('g').attr('transform', `translate(${off},0)`); g.append('rect').attr('width', 10).attr('height', 10).attr('y', -8).attr('rx', 3).attr('fill', dash.colors[i]); const t = g.append('text').attr('x', 15).attr('fill', 'var(--color-fg)').text(`${label} ${d3.format('.1f')(rows[rows.length - 1][k])}%`); off += 15 + t.node().getComputedTextLength() + 16; });
+  }
+  function renderMeta() {
+    const s = state('meta'); const el = document.getElementById('meta-line');
+    if (s.status !== 'ok') return;
+    const f = (t) => t ? d3.utcFormat('%-d %b %Y %H:%M UTC')(new Date(t)) : '—';
+    el.textContent = `Updated daily. RPKI data built ${f(s.data.rpki_buildtime)} · routing data from RIPE RIS up to ${f(s.data.ris_query + (String(s.data.ris_query).endsWith('Z') ? '' : 'Z'))}`;
+  }
+
+  dash.onData(render);
+
+  const named = location.hash.slice(1);
+  if (['overview', 'findings', 'aspa', 'asns', 'method'].includes(named)) showTab(named, false);
+})();
+</script>
+
+</div>
+</body>
+</html>
