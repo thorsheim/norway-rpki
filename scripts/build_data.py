@@ -427,7 +427,7 @@ def diff_state(prev, cur):
             po, co = p["f"].get(key, []), c["f"].get(key, [])
             partial = any(o.startswith("__count__") for o in po)
             if partial:  # previous objects unknown: compare at category level
-                pn = int(po[0][9:]) if po else 0
+                pn = sum(int(o[9:]) for o in po)
                 if not co:
                     ev.append({"k": "-", "g": 1 if bad else 0, "c": "finding", "t": f"Resolved: {cat} ({sev})"})
                 elif not po:
