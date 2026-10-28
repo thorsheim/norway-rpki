@@ -104,12 +104,32 @@ a { color: inherit; }
 .nr-method li { margin-bottom: 6px; }
 [data-dash-source-state=empty] { color: transparent; }
 [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.nr-d { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; line-height: 1.6; cursor: help; white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; font-family: var(--font-anthropic-sans); }
+.nr-d.good { color: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 14%, transparent); }
+.nr-d.bad { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 14%, transparent); }
+.nr-d.neutral { color: var(--color-fg-muted); background: color-mix(in srgb, var(--color-fg-muted) 15%, transparent); }
+.nr-d:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+.nr-kpi .kd { min-height: 1.5em; margin: -2px 0 2px; }
+.nr td.num { white-space: nowrap; }
+.nr-cov .bar { min-width: 48px; }
+.nr-cov .nr-d { margin-left: 2px; }
+.nr-kpi .kd .nr-d { margin-left: 0; }
+.nr-tipbox { position: fixed; display: none; z-index: 60; max-width: min(440px, calc(100vw - 16px)); background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: 8px 11px; font-size: var(--cds-font-size-caption); line-height: 1.45; pointer-events: none; color: var(--color-fg); }
+.nr-tipbox .tt { font-weight: 600; margin-bottom: 4px; }
+.nr-tipbox ul { list-style: none; margin: 0; padding: 0; }
+.nr-tipbox li { display: flex; gap: 6px; margin: 2px 0; overflow-wrap: anywhere; }
+.nr-tipbox .sg { flex: none; width: 1em; text-align: center; font-weight: 700; }
+.sg.good { color: var(--color-ok); } .sg.bad { color: var(--color-bad); } .sg.neutral { color: var(--color-fg-muted); }
+.nr-tipbox .more { margin-top: 5px; color: var(--color-fg-muted); }
+.nr-chg-sum { margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.nr-chg-sum .nr-d { margin-left: 0; }
+.nr-chg-sum button { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--color-fg); text-decoration: underline; cursor: pointer; }
 </style>
 <script>
 // Minimal runtime: loads the published JSON files and offers the small API the page uses.
 window.dash = (function () {
   const files = { asns: 'data/no_asns_rpki.json', vrps: 'data/no_vrps.json', aspa: 'data/no_aspa.json',
-                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json' };
+                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/no_changes.json' };
   const state = {}, calcs = {}, subs = [];
   Object.keys(files).forEach(id => { state[id] = { status: 'loading', data: [] }; });
   const notify = () => subs.forEach(f => { try { f(); } catch (e) { console.error(e); } });
@@ -148,6 +168,7 @@ window.dash = (function () {
   <div class="nr-head">
     <h1 id="title">Norway RPKI: ROA &amp; ASPA posture</h1>
     <p class="nr-meta" id="meta-line">&nbsp;</p>
+    <p class="nr-chg-sum" id="chg-sum"></p>
     <p class="nr-take" id="takeaway">
       Every announcement from <span data-source="kpi" data-field="full" data-row="0" class="dash-skeleton">—</span> of
       <span data-source="kpi" data-field="routed" data-row="0" class="dash-skeleton">—</span> routed Norwegian ASNs is RPKI-valid, while
@@ -160,6 +181,7 @@ window.dash = (function () {
 
   <div class="nr-tabs" role="tablist">
     <button class="nr-tab" role="tab" aria-selected="true" data-tab="overview" id="tab-overview">Overview</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="changes" id="tab-changes">Changes</button>
     <button class="nr-tab" role="tab" aria-selected="false" data-tab="findings" id="tab-findings">Findings</button>
     <button class="nr-tab" role="tab" aria-selected="false" data-tab="aspa" id="tab-aspa">ASPA</button>
     <button class="nr-tab" role="tab" aria-selected="false" data-tab="asns" id="tab-asns">All ASNs</button>
@@ -169,12 +191,12 @@ window.dash = (function () {
   <!-- OVERVIEW -->
   <section class="nr-panel" data-panel="overview" id="overview">
     <div class="nr-kpis">
-      <div class="nr-kpi"><div class="lab">Routed NO ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered</div></div>
-      <div class="nr-kpi"><div class="lab">All routes valid</div><div class="val" data-source="kpi" data-field="full_share" data-row="0">—</div><div class="sub">share of routed ASNs</div></div>
-      <div class="nr-kpi"><div class="lab">IPv4 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v4_cov" data-row="0">—</div><div class="sub">of announced Norwegian IPv4</div></div>
-      <div class="nr-kpi"><div class="lab">IPv6 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v6_cov" data-row="0">—</div><div class="sub">of announced Norwegian IPv6</div></div>
-      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
-      <div class="nr-kpi"><div class="lab">High-severity findings</div><div class="val" data-source="kpi" data-field="high" data-row="0">—</div><div class="sub"><span data-source="kpi" data-field="invalid" data-row="0">—</span> invalid route(s) · <span data-source="kpi" data-field="medium" data-row="0">—</span> medium</div></div>
+      <div class="nr-kpi"><div class="lab">Routed NO ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="kd" data-kd="routed"></div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered</div></div>
+      <div class="nr-kpi"><div class="lab">All routes valid</div><div class="val" data-source="kpi" data-field="full_share" data-row="0">—</div><div class="kd" data-kd="full_share"></div><div class="sub">share of routed ASNs</div></div>
+      <div class="nr-kpi"><div class="lab">IPv4 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v4_cov" data-row="0">—</div><div class="kd" data-kd="v4_cov"></div><div class="sub">of announced Norwegian IPv4</div></div>
+      <div class="nr-kpi"><div class="lab">IPv6 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v6_cov" data-row="0">—</div><div class="kd" data-kd="v6_cov"></div><div class="sub">of announced Norwegian IPv6</div></div>
+      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="kd" data-kd="aspa_all"></div><div class="sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
+      <div class="nr-kpi"><div class="lab">High-severity findings</div><div class="val" data-source="kpi" data-field="high" data-row="0">—</div><div class="kd" data-kd="high"></div><div class="sub"><span data-source="kpi" data-field="invalid" data-row="0">—</span> invalid route(s) · <span data-source="kpi" data-field="medium" data-row="0">—</span> medium</div></div>
     </div>
 
     <div class="nr-card nr-full" id="trend-card">
@@ -224,6 +246,37 @@ window.dash = (function () {
             <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
             <th data-field="aspa"><button>ASPA</button></th>
             <th data-field="high" class="num"><button>High</button></th>
+            <th data-field="chg_total"><button>Changes</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHANGES -->
+  <section class="nr-panel" data-panel="changes" id="changes" hidden>
+    <div class="nr-card nr-full">
+      <h2>What changed since the previous update</h2>
+      <p class="note" id="chg-note">Every change per ASN between the two most recent updates: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.</p>
+      <div class="nr-tools">
+        <div id="chg-chips" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="nr-chip" aria-pressed="true" data-g="">All</button>
+          <button class="nr-chip" aria-pressed="false" data-g="-1">Regressions</button>
+          <button class="nr-chip" aria-pressed="false" data-g="1">Improvements</button>
+          <button class="nr-chip" aria-pressed="false" data-g="0">Neutral</button>
+        </div>
+        <input class="nr-search" id="chg-search" type="search" placeholder="Search ASN, name, prefix…">
+        <span class="nr-count" id="chg-count"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="changes" data-row-key="id" id="chg-table">
+          <thead><tr>
+            <th data-field="good"><button>Change</button></th>
+            <th data-field="area"><button>Area</button></th>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="text"><button>What changed</button></th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -307,7 +360,6 @@ window.dash = (function () {
             <th data-field="invalid" class="num"><button>Invalid</button></th>
             <th data-field="valid_pct"><button>Routes valid</button></th>
             <th data-field="vrps" class="num"><button>VRPs</button></th>
-            <th data-field="vrps_prev" class="num"><button>VRPs 14 Oct</button></th>
             <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
             <th data-field="loose_maxlen_v4" class="num"><button>Loose maxLen</button></th>
             <th data-field="unannounced_vrps" class="num"><button>Unannounced VRPs</button></th>
@@ -316,6 +368,7 @@ window.dash = (function () {
             <th data-field="ca_model"><button>CA model</button></th>
             <th data-field="high" class="num"><button>High</button></th>
             <th data-field="medium" class="num"><button>Med</button></th>
+            <th data-field="chg_total"><button>Changes</button></th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -339,6 +392,7 @@ window.dash = (function () {
         <li><b>Route validity:</b> each announcement is validated per RFC 6811 against every VRP worldwide: Valid, Invalid (wrong origin AS, or longer than maxLength) or NotFound.</li>
         <li><b>maxLength:</b> a ROA is flagged when maxLength is longer than the prefix <i>and</i> more-specifics in that range are not all announced. “Wide” is IPv4 4+ bits, “loose” 1–3 bits; IPv6 from 16 bits.</li>
         <li><b>Unannounced ROAs:</b> ROA prefixes with no announcement from that AS inside or around them. When another Norwegian AS announces the space, it is flagged as a likely migration leftover.</li>
+        <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab lists everything.</li>
         <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
       </ul>
       <h3>What this does not show</h3>
@@ -450,6 +504,95 @@ window.dash = (function () {
     td.appendChild(w);
   }
 
+  // ---------- change badges and popups
+  const fmtN = (v, unit) => v == null ? '—' : d3.format(',.4~f')(Math.round(v * 10) / 10) + (unit || '');
+  const fmtSigned = (v, unit) => (v > 0 ? '+' : '−') + fmtN(Math.abs(v), unit);
+  const tipFor = new WeakMap();
+  const tipBox = document.createElement('div'); tipBox.className = 'nr-tipbox'; tipBox.setAttribute('role', 'tooltip');
+  document.body.appendChild(tipBox);
+  const MAXL = 14;
+  function prevLabel() {
+    const m = state('meta');
+    const t = m.status === 'ok' && m.data.prev_generated;
+    return t ? 'the update of ' + d3.utcFormat('%-d %b %H:%M UTC')(new Date(t)) : 'the previous update';
+  }
+  function fillTip(spec) {
+    clear(tipBox);
+    if (spec.title) { const h = document.createElement('div'); h.className = 'tt'; h.textContent = spec.title; tipBox.appendChild(h); }
+    const lines = spec.lines || [];
+    if (lines.length) {
+      const ul = document.createElement('ul');
+      lines.slice(0, MAXL).forEach(e => {
+        const li = document.createElement('li'); const sg = document.createElement('span');
+        sg.className = 'sg ' + (e.g > 0 ? 'good' : e.g < 0 ? 'bad' : 'neutral');
+        sg.textContent = e.k === '+' ? '+' : e.k === '-' ? '−' : '~'; li.appendChild(sg);
+        const tx = document.createElement('span'); tx.textContent = e.t; li.appendChild(tx); ul.appendChild(li);
+      });
+      tipBox.appendChild(ul);
+    }
+    const more = Math.max(0, lines.length - MAXL) + (spec.more || 0);
+    if (more || spec.note) {
+      const m = document.createElement('div'); m.className = 'more';
+      m.textContent = more ? `…and ${more} more — see the Changes tab.` : spec.note; tipBox.appendChild(m);
+    }
+  }
+  function showTip(el) {
+    const spec = tipFor.get(el); if (!spec) return;
+    fillTip(typeof spec === 'function' ? spec() : spec);
+    tipBox.style.display = 'block';
+    const r = el.getBoundingClientRect(), w = tipBox.offsetWidth, h = tipBox.offsetHeight;
+    const x = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+    let y = r.bottom + 6; if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    tipBox.style.left = x + 'px'; tipBox.style.top = y + 'px';
+  }
+  const hideTip = () => { tipBox.style.display = 'none'; };
+  const badgeOf = (t) => t && t.closest ? t.closest('.nr-d') : null;
+  document.addEventListener('mouseover', e => { const b = badgeOf(e.target); if (b) showTip(b); else hideTip(); });
+  document.addEventListener('focusin', e => { const b = badgeOf(e.target); if (b) showTip(b); });
+  document.addEventListener('focusout', hideTip);
+  document.addEventListener('click', e => { const b = badgeOf(e.target); if (b) showTip(b); else hideTip(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+  window.addEventListener('scroll', hideTip, true);
+  function badge(parent, text, tone, spec) {
+    const b = document.createElement('span'); b.className = 'nr-d ' + tone; b.tabIndex = 0; b.textContent = text;
+    b.setAttribute('aria-label', text + ' — change details'); tipFor.set(b, spec); parent.appendChild(b); return b;
+  }
+  const toneOf = (g) => g > 0 ? 'good' : g < 0 ? 'bad' : 'neutral';
+  // numeric change of one field; goodDir: 1 if an increase is good, -1 if bad, 0 neutral
+  function deltaBadge(parent, x, field, goodDir, label, areas, unit) {
+    const d = x['d_' + field]; if (d == null || d === 0) return;
+    const prev = (x[field] ?? 0) - d;
+    const lines = (x.changes || []).filter(e => !areas || areas.includes(e.c));
+    badge(parent, fmtSigned(d, unit), toneOf(goodDir * Math.sign(d)),
+      () => ({ title: `AS${x.asn} ${label}: ${fmtN(prev)} → ${fmtN(x[field])} since ${prevLabel()}`, lines, more: lines.length ? x.changes_more : 0 }));
+  }
+  function changesBadge(parent, x, evs, more) {
+    evs = evs || x.changes || []; if (!evs.length) return;
+    const n = (k) => evs.filter(e => e.k === k).length;
+    const parts = []; if (n('+')) parts.push('+' + n('+')); if (n('-')) parts.push('−' + n('-')); if (n('~')) parts.push('~' + n('~'));
+    const good = evs.filter(e => e.g > 0).length, bad = evs.filter(e => e.g < 0).length;
+    badge(parent, parts.join(' '), bad > good ? 'bad' : good > bad ? 'good' : 'neutral',
+      () => ({ title: `AS${x.asn ?? x.customer} ${x.name}: ${evs.length + (more || 0)} change${evs.length + (more || 0) === 1 ? '' : 's'} since ${prevLabel()}`, lines: evs, more: more || 0 }));
+  }
+  function statusCell(td, x) {
+    td.textContent = x.roa_status;
+    if (x.status_prev && x.status_prev !== x.roa_status) {
+      const rank = { 'None valid': 0, 'Partly valid': 1, 'All valid': 2 };
+      const a = rank[x.status_prev], b = rank[x.roa_status];
+      const g = a == null || b == null ? 0 : Math.sign(b - a);
+      badge(td, g > 0 ? '▲' : g < 0 ? '▼' : '~', toneOf(g),
+        () => ({ title: `Was “${x.status_prev}” at ${prevLabel()}`, lines: (x.changes || []).filter(e => e.c === 'status' || e.c === 'route'), more: x.changes_more }));
+    }
+  }
+  const numD = (field, goodDir, label, areas, unit) => (td, x) => {
+    td.textContent = x[field] == null ? '' : fmtN(x[field]);
+    deltaBadge(td, x, field, goodDir, label, areas, unit);
+  };
+  const covD = (field, goodDir, label, areas) => (td, x) => {
+    covCell(td, x[field]); deltaBadge(td.querySelector('.nr-cov'), x, field, goodDir, label + ' (%)', areas, ' pp');
+  };
+  const chgCell = (td, x) => changesBadge(td, x, x.changes, x.changes_more);
+
   // Generic sortable/searchable table
   const tables = {};
   function setupTable(id, opts) {
@@ -494,11 +637,16 @@ window.dash = (function () {
   const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
   const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
 
-  setupTable('top-table', { sortKey: 'v4_24s', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn'] });
+  setupTable('top-table', { sortKey: 'v4_24s', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTable('chg-table', { sortKey: 'good', sortDir: 'asc', search: 'chg-search', numeric: ['asn'] });
   setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
   setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
-  setupTable('asn-table', { sortKey: 'asn', sortDir: 'asc', search: 'asn-search', numeric: ['asn', 'prefixes_v4', 'prefixes_v6', 'valid', 'notfound', 'invalid', 'valid_pct', 'vrps', 'vrps_prev', 'wide_maxlen_v4', 'loose_maxlen_v4', 'unannounced_vrps', 'high', 'medium'] });
+  setupTable('asn-table', { sortKey: 'asn', sortDir: 'asc', search: 'asn-search', numeric: ['asn', 'prefixes_v4', 'prefixes_v6', 'valid', 'notfound', 'invalid', 'valid_pct', 'vrps', 'wide_maxlen_v4', 'loose_maxlen_v4', 'unannounced_vrps', 'high', 'medium', 'chg_total'] });
 
+  document.querySelectorAll('#chg-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#chg-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    const g = b.dataset.g; tables['chg-table'].filter = g === '' ? null : (x => x.good === Number(g)); render();
+  }));
   document.querySelectorAll('#sev-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('#sev-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
     const s = b.dataset.sev; tables['find-table'].filter = s ? (x => x.severity === s) : null; render();
@@ -526,6 +674,66 @@ window.dash = (function () {
       else el.textContent = '—';
     });
   }
+
+  function renderKpiDeltas() {
+    const m = state('meta'), a = state('asns');
+    document.querySelectorAll('[data-kd]').forEach(clear);
+    const sum = document.getElementById('chg-sum'); clear(sum);
+    if (m.status !== 'ok' || !m.data.prev_headline || !m.data.headline) return;
+    const h = m.data.headline, p = m.data.prev_headline, rows = a.status === 'ok' ? a.data : [];
+    const lab = (r) => `AS${r.asn} ${r.name}`;
+    const ev = (filter) => rows.flatMap(r => (r.changes || []).filter(filter).map(e => ({ ...e, t: `${lab(r)}: ${e.t}` })));
+    const share = (o) => o.routed ? 100 * o.all_valid / o.routed : 0;
+    const v6re = /[0-9a-f]{1,4}:[0-9a-f:]*\/\d+/i;
+    const spec = {
+      routed: { cur: h.routed, prev: p.routed, dir: 0, pct: false,
+        lines: () => rows.filter(r => r.status_prev && ((r.status_prev === 'Not routed') !== (r.roa_status === 'Not routed')))
+          .map(r => ({ k: r.roa_status === 'Not routed' ? '-' : '+', g: 0, t: `${lab(r)}: ${r.roa_status === 'Not routed' ? 'no longer routed' : 'now routed'}` })) },
+      full_share: { cur: share(h), prev: share(p), dir: 1, pct: true, lines: () => ev(e => e.c === 'status') },
+      v4_cov: { cur: h.v4_valid_pct, prev: p.v4_valid_pct, dir: 1, pct: true,
+        lines: () => rows.filter(r => r.d_cov_v4_pct).sort((x, y) => Math.abs(y.d_cov_v4_pct) - Math.abs(x.d_cov_v4_pct))
+          .map(r => ({ k: '~', g: Math.sign(r.d_cov_v4_pct), t: `${lab(r)}: IPv4 space valid ${fmtN(r.cov_v4_pct - r.d_cov_v4_pct)}% → ${fmtN(r.cov_v4_pct)}%` })) },
+      v6_cov: { cur: h.v6_valid_pct, prev: p.v6_valid_pct, dir: 1, pct: true, lines: () => ev(e => e.c === 'route' && v6re.test(e.t)) },
+      aspa_all: { cur: h.aspa, prev: p.aspa, dir: 1, pct: false, lines: () => ev(e => e.c === 'aspa') },
+      high: { cur: h.high, prev: p.high, dir: -1, pct: false, lines: () => ev(e => e.c === 'finding' && /high finding|\(High\)/.test(e.t)) }
+    };
+    Object.entries(spec).forEach(([k, o]) => {
+      const el = document.querySelector(`[data-kd="${k}"]`); if (!el || o.cur == null || o.prev == null) return;
+      const d = Math.round((o.cur - o.prev) * 10) / 10;
+      if (!d) return;
+      const pf = (v) => fmtN(v) + (o.pct ? '%' : '');
+      badge(el, fmtSigned(d, o.pct ? ' pp' : ''), toneOf(o.dir * Math.sign(d)),
+        () => ({ title: `${pf(o.prev)} → ${pf(o.cur)} since ${prevLabel()}`, lines: o.lines() }));
+    });
+    const c = state('changes');
+    if (c.status === 'ok') {
+      const all = c.data, fmtE = (e) => ({ k: e.kind, g: e.good, t: `AS${e.asn} ${e.name}: ${e.text}` });
+      const good = all.filter(e => e.good > 0), bad = all.filter(e => e.good < 0), neu = all.filter(e => e.good === 0);
+      const asns = new Set(all.map(e => e.asn)).size;
+      sum.appendChild(document.createTextNode(all.length
+        ? `Since ${prevLabel()}: ${d3.format(',')(all.length)} change${all.length === 1 ? '' : 's'} across ${asns} ASN${asns === 1 ? '' : 's'}`
+        : `No changes since ${prevLabel()}.`));
+      if (bad.length) badge(sum, `${bad.length} worse`, 'bad', () => ({ title: 'Regressions', lines: bad.map(fmtE) }));
+      if (good.length) badge(sum, `${good.length} better`, 'good', () => ({ title: 'Improvements', lines: good.map(fmtE) }));
+      if (neu.length) badge(sum, `${neu.length} neutral`, 'neutral', () => ({ title: 'Neutral changes', lines: neu.map(fmtE) }));
+      if (all.length) { const b = document.createElement('button'); b.textContent = 'See all changes'; b.addEventListener('click', () => showTab('changes', true)); sum.appendChild(b); }
+    }
+  }
+
+  function renderChanges() {
+    const s = state('changes'); if (s.status !== 'ok') return;
+    const m = state('meta');
+    const note = document.getElementById('chg-note');
+    note.textContent = (m.status === 'ok' && m.data.changes_detail === 'partial')
+      ? `Changes since ${prevLabel()}. That update predates detailed tracking, so findings are compared per type and announcements are not listed one by one; from the next update every prefix-level change is shown. Green is an improvement, red a regression, grey neutral.`
+      : `Every change per ASN since ${prevLabel()}: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.`;
+    const rows = s.data.map((e, i) => ({ ...e, _i: i }));
+    drawTable('chg-table', rows, [
+      { f: 'good', render: (td, x) => { const b = document.createElement('span'); b.className = 'nr-d ' + toneOf(x.good); b.style.marginLeft = '0'; b.style.cursor = 'default'; b.textContent = x.kind === '+' ? '+' : x.kind === '-' ? '−' : '~'; td.appendChild(b); } },
+      { f: 'area' }, { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'text', cls: 'wrap mono' }
+    ], { key: 'id', count: 'chg-count', sorter: (st) => st.key === 'good' ? ((a, b) => (st.dir === 'asc' ? 1 : -1) * (a.good - b.good) || a._i - b._i) : null });
+  }
+
 
   function renderStatus() {
     const el = document.getElementById('status-chart'); const s = state('status_mix');
@@ -610,17 +818,22 @@ window.dash = (function () {
     const s = state('asns'); const t = document.getElementById('top-table');
     if (s.status !== 'ok') { clear(t.querySelector('tbody')); return; }
     drawTable('top-table', s.data.filter(r => r.routed === 'yes'), [
-      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numCell('v4_24s') }, { f: 'roa_status' },
-      { f: 'cov_v4_pct', render: (td, x) => covCell(td, x.cov_v4_pct) }, { f: 'valid_pct', render: (td, x) => covCell(td, x.valid_pct) },
-      { f: 'wide_maxlen_v4', cls: 'num', render: numCell('wide_maxlen_v4') }, { f: 'aspa' }, { f: 'high', cls: 'num', render: numCell('high') }
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numD('v4_24s', 0, 'announced IPv4 /24s', ['route']) }, { f: 'roa_status', render: statusCell },
+      { f: 'cov_v4_pct', render: covD('cov_v4_pct', 1, 'IPv4 space valid', ['route', 'status']) }, { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
+      { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
+      { f: 'aspa', render: (td, x) => { td.textContent = x.aspa; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
+      { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'chg_total', render: chgCell }
     ], { key: 'asn', limit: 20 });
   }
+
+  let _asnMap = null, _asnSrc = null;
+  function asnMap() { const s = state('asns'); if (s.data !== _asnSrc) { _asnSrc = s.data; _asnMap = new Map((s.data || []).map(r => [r.asn, r])); } return _asnMap; }
 
   function renderFindings() {
     const s = state('findings'); if (s.status !== 'ok') return;
     const st = tables['find-table'];
     drawTable('find-table', s.data, [
-      { f: 'severity', render: sevCell }, { f: 'category' }, { f: 'asn', render: asCell('asn') }, { f: 'name' },
+      { f: 'severity', render: (td, x) => { sevCell(td, x); if (x.is_new === 'yes') { const r = asnMap().get(x.asn); badge(td, 'New', x.severity === 'High' || x.severity === 'Medium' ? 'bad' : 'neutral', () => ({ title: `New since ${prevLabel()}`, lines: ((r && r.changes) || []).filter(e => e.c === 'finding' && e.t.includes(x.category)) })); } } }, { f: 'category' }, { f: 'asn', render: asCell('asn') }, { f: 'name' },
       { f: 'objects', cls: 'wrap mono' }, { f: 'detail', cls: 'wrap' }
     ], { key: 'id', count: 'find-count', sorter: (st) => st.key === 'severity' ? ((a, b) => { const c = SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.v4_24s - a.v4_24s || a.asn - b.asn; return st.dir === 'asc' ? c : -c; }) : null });
   }
@@ -628,7 +841,7 @@ window.dash = (function () {
   function renderAspa() {
     const s = state('aspa'); if (s.status !== 'ok') return;
     drawTable('aspa-table', s.data, [
-      { f: 'customer', render: asCell('customer') }, { f: 'name' }, { f: 'routed' }, { f: 'providers', cls: 'wrap' },
+      { f: 'customer', render: asCell('customer') }, { f: 'name' }, { f: 'routed' }, { f: 'providers', cls: 'wrap', render: (td, x) => { td.textContent = x.providers; changesBadge(td, x, x.changes); } },
       { f: 'provider_count', cls: 'num' }, { f: 'neighbours_seen', cls: 'wrap' },
       { f: 'unlisted_neighbours', render: (td, x) => { td.textContent = x.unlisted_neighbours; if (x.unlisted_neighbours) td.style.color = 'var(--color-warn)'; } },
       { f: 'unobserved_providers' }
@@ -638,17 +851,22 @@ window.dash = (function () {
   function renderAsns() {
     const s = state('asns'); if (s.status !== 'ok') return;
     drawTable('asn-table', s.data, [
-      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'routed' }, { f: 'roa_status' },
-      { f: 'prefixes_v4', cls: 'num' }, { f: 'prefixes_v6', cls: 'num' },
-      { f: 'valid', cls: 'num' }, { f: 'notfound', cls: 'num' }, { f: 'invalid', cls: 'num', render: (td, x) => { td.textContent = String(x.invalid); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
-      { f: 'valid_pct', render: (td, x) => covCell(td, x.valid_pct) },
-      { f: 'vrps', cls: 'num' }, { f: 'vrps_prev', cls: 'num' }, { f: 'wide_maxlen_v4', cls: 'num' }, { f: 'loose_maxlen_v4', cls: 'num' }, { f: 'unannounced_vrps', cls: 'num' },
-      { f: 'aspa_providers', cls: 'wrap' }, { f: 'upstreams_seen', cls: 'wrap' }, { f: 'ca_model' }, { f: 'high', cls: 'num' }, { f: 'medium', cls: 'num' }
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'routed' }, { f: 'roa_status', render: statusCell },
+      { f: 'prefixes_v4', cls: 'num', render: numD('prefixes_v4', 0, 'IPv4 announcements', ['route']) }, { f: 'prefixes_v6', cls: 'num', render: numD('prefixes_v6', 0, 'IPv6 announcements', ['route']) },
+      { f: 'valid', cls: 'num', render: numD('valid', 1, 'valid routes', ['route']) }, { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'NotFound routes', ['route']) },
+      { f: 'invalid', cls: 'num', render: (td, x) => { numD('invalid', -1, 'invalid routes', ['route', 'finding'])(td, x); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
+      { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
+      { f: 'vrps', cls: 'num', render: numD('vrps', 0, 'ROA prefixes', ['roa']) }, { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
+      { f: 'loose_maxlen_v4', cls: 'num', render: numD('loose_maxlen_v4', -1, 'loose maxLength ROAs', ['roa', 'finding']) }, { f: 'unannounced_vrps', cls: 'num', render: numD('unannounced_vrps', -1, 'ROAs for unannounced space', ['roa', 'route', 'finding']) },
+      { f: 'aspa_providers', cls: 'wrap', render: (td, x) => { td.textContent = x.aspa_providers; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
+      { f: 'upstreams_seen', cls: 'wrap' }, { f: 'ca_model' },
+      { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'medium', cls: 'num', render: numD('medium', -1, 'medium findings', ['finding']) },
+      { f: 'chg_total', render: chgCell }
     ], { key: 'asn', count: 'asn-count' });
   }
 
   function render() {
-    renderKpi(); renderMeta();
+    renderKpi(); renderMeta(); renderKpiDeltas();
     const cur = (document.querySelector('.nr-tab[aria-selected="true"]') || {}).dataset?.tab || 'overview';
     if (cur === 'overview') {
       renderTrend();
@@ -658,6 +876,7 @@ window.dash = (function () {
       renderMaxlen();
       renderTop();
     }
+    if (cur === 'changes') renderChanges();
     if (cur === 'findings') renderFindings();
     if (cur === 'aspa') renderAspa();
     if (cur === 'asns') renderAsns();
@@ -702,7 +921,7 @@ window.dash = (function () {
   dash.onData(render);
 
   const named = location.hash.slice(1);
-  if (['overview', 'findings', 'aspa', 'asns', 'method'].includes(named)) showTab(named, false);
+  if (['overview', 'changes', 'findings', 'aspa', 'asns', 'method'].includes(named)) showTab(named, false);
 })();
 </script>
 

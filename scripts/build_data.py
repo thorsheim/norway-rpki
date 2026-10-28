@@ -211,7 +211,7 @@ def analyze(raw, prev_rows):
         F.append({"id": f"{len(F):04d}-{a}", "severity": sev, "category": cat, "asn": int(a), "name": names.get(a, ""),
                   "count": n if n is not None else len(objs),
                   "objects": ", ".join(objs[:8]) + (f" (+{len(objs) - 8} more)" if len(objs) > 8 else ""),
-                  "detail": detail, "v4_24s": 0})
+                  "detail": detail, "v4_24s": 0, "_objs": list(objs)})
 
     for a, d in A.items():
         L = ann[a]
@@ -322,9 +322,177 @@ def analyze(raw, prev_rows):
                         "unobserved_providers": ", ".join(f"AS{p}" for p in notseen),
                         "new_since_prev": "yes" if (prev and pv.get("aspa") != "yes") else "no"})
     v4map = {r["asn"]: r["v4_24s"] for r in rows}
+    sev = collections.defaultdict(collections.Counter)
     for x in F:
         x["v4_24s"] = v4map[x["asn"]]
+        sev[x["asn"]][x["severity"]] += 1
+    for r in rows:
+        r["high"], r["medium"], r["low"] = sev[r["asn"]]["High"], sev[r["asn"]]["Medium"], sev[r["asn"]]["Low"]
     return rows, V, ASP, F
+
+
+# ---------------------------------------------------------------- change tracking
+STATUS_RANK = {"None valid": 0, "Partly valid": 1, "All valid": 2}
+ROV_RANK = {"I": 0, "N": 1, "V": 2}
+ROV_NAME = {"V": "Valid", "N": "NotFound", "I": "Invalid"}
+DELTA_FIELDS = ["prefixes_v4", "prefixes_v6", "valid", "notfound", "invalid", "valid_pct", "cov_v4_pct", "v4_24s",
+                "vrps", "wide_maxlen_v4", "loose_maxlen_v4", "unannounced_vrps", "high", "medium", "low"]
+
+
+def make_state(raw, rows, F):
+    st = {r["asn"]: {"st": r["roa_status"], "ann": {}, "v": [], "aspa": [], "f": {}} for r in rows}
+    for a, d in raw["asns"].items():
+        s = st[int(a)]
+        s["ann"] = {x["p"]: x["s"] for x in d["ann"]}
+        s["v"] = sorted({f"{p}-{ml}" for p, ml, *_ in d["v"]})
+        s["aspa"] = sorted({p for x in d["aspa"] for p in x})
+    for f in F:
+        st[f["asn"]]["f"].setdefault(f"{f['severity']}|{f['category']}", []).extend(f["_objs"])
+    return {"generated": raw["meta"]["generated"], "rpki_buildtime": raw["meta"]["rpki_buildtime"],
+            "asns": {str(k): v for k, v in st.items()}}
+
+
+def state_from_files(rows, vrps, aspa, findings, meta):
+    """Fallback when no state.json exists yet: rebuild what we can from the published files."""
+    st = {r["asn"]: {"st": r["roa_status"], "ann": None, "v": [], "aspa": [], "f": {}} for r in rows}
+    for v in vrps:
+        if v["asn"] in st:
+            st[v["asn"]]["v"].append(f"{v['prefix']}-{v['maxlen']}")
+    for x in aspa:
+        if x["customer"] in st:
+            st[x["customer"]]["aspa"] = sorted(int(p[2:]) for p in x["providers"].split(", ") if p.startswith("AS"))
+    for f in findings:
+        if f["asn"] in st:
+            st[f["asn"]]["f"].setdefault(f"{f['severity']}|{f['category']}", []).append(f"__count__{f['count']}")
+    return {"generated": meta.get("generated"), "rpki_buildtime": meta.get("rpki_buildtime"),
+            "asns": {str(k): v for k, v in st.items()}, "partial": True}
+
+
+_VOLATILE = re.compile(r" \((?:\d+ announced|seen by \d+ RIS peers)\)")
+
+
+def _norm(o):
+    return _VOLATILE.sub("", o)
+
+
+def diff_state(prev, cur):
+    """Per-ASN list of change events. k: '+', '-' or '~'; g: 1 better, -1 worse, 0 neutral."""
+    out = {}
+    P, C = prev["asns"], cur["asns"]
+    for a in sorted(set(P) | set(C), key=int):
+        p, c, ev = P.get(a), C.get(a), []
+        if p is None:
+            ev.append({"k": "+", "g": 0, "c": "asn", "t": "Newly counted as a Norwegian ASN"})
+            p = {"st": "Not routed", "ann": {}, "v": [], "aspa": [], "f": {}}
+        if c is None:
+            out[a] = [{"k": "-", "g": 0, "c": "asn", "t": "No longer in the list of Norwegian ASNs"}]
+            continue
+        if p["st"] != c["st"]:
+            ra, rb = STATUS_RANK.get(p["st"]), STATUS_RANK.get(c["st"])
+            g = 0 if ra is None or rb is None else (1 if rb > ra else -1)
+            ev.append({"k": "~", "g": g, "c": "status", "t": f"Route validity: {p['st']} → {c['st']}"})
+        if p["ann"] is not None:
+            for pf in sorted(set(c["ann"]) - set(p["ann"])):
+                s = c["ann"][pf]
+                ev.append({"k": "+", "g": {"V": 1, "N": 0, "I": -1}[s], "c": "route", "t": f"Now announces {pf} ({ROV_NAME[s]})"})
+            for pf in sorted(set(p["ann"]) - set(c["ann"])):
+                s = p["ann"][pf]
+                ev.append({"k": "-", "g": 1 if s == "I" else 0, "c": "route", "t": f"Stopped announcing {pf} (was {ROV_NAME[s]})"})
+            for pf in sorted(set(p["ann"]) & set(c["ann"])):
+                a1, b1 = p["ann"][pf], c["ann"][pf]
+                if a1 != b1:
+                    ev.append({"k": "~", "g": 1 if ROV_RANK[b1] > ROV_RANK[a1] else -1, "c": "route",
+                               "t": f"{pf}: {ROV_NAME[a1]} → {ROV_NAME[b1]}"})
+        for v in sorted(set(c["v"]) - set(p["v"])):
+            pf, ml = v.rsplit("-", 1)
+            ev.append({"k": "+", "g": 0, "c": "roa", "t": f"New ROA {pf} maxLength {ml}"})
+        for v in sorted(set(p["v"]) - set(c["v"])):
+            pf, ml = v.rsplit("-", 1)
+            ev.append({"k": "-", "g": 0, "c": "roa", "t": f"ROA removed: {pf} maxLength {ml}"})
+        pa, ca_ = set(p["aspa"]), set(c["aspa"])
+        if pa != ca_:
+            fmt = lambda x: "AS0" if x == 0 else f"AS{x}"
+            if not pa:
+                ev.append({"k": "+", "g": 1, "c": "aspa", "t": "ASPA published: " + ", ".join(fmt(x) for x in sorted(ca_))})
+            elif not ca_:
+                ev.append({"k": "-", "g": -1, "c": "aspa", "t": "ASPA removed (was " + ", ".join(fmt(x) for x in sorted(pa)) + ")"})
+            else:
+                for x in sorted(ca_ - pa):
+                    ev.append({"k": "+", "g": 0, "c": "aspa", "t": f"ASPA provider added: {fmt(x)}"})
+                for x in sorted(pa - ca_):
+                    ev.append({"k": "-", "g": 0, "c": "aspa", "t": f"ASPA provider removed: {fmt(x)}"})
+        for key in sorted(set(p["f"]) | set(c["f"])):
+            sev, cat = key.split("|", 1)
+            bad = sev in ("High", "Medium")
+            po, co = p["f"].get(key, []), c["f"].get(key, [])
+            partial = any(o.startswith("__count__") for o in po)
+            if partial:  # previous objects unknown: compare at category level
+                pn = int(po[0][9:]) if po else 0
+                if not co:
+                    ev.append({"k": "-", "g": 1 if bad else 0, "c": "finding", "t": f"Resolved: {cat} ({sev})"})
+                elif not po:
+                    ev.append({"k": "+", "g": -1 if bad else 0, "c": "finding", "t": f"New finding: {cat} ({sev})"})
+                elif pn != len(co):
+                    ev.append({"k": "~", "g": (1 if len(co) < pn else -1) if bad else 0, "c": "finding",
+                               "t": f"{cat} ({sev}): {pn} → {len(co)} objects"})
+                continue
+            pn_, cn_ = {_norm(o) for o in po}, {_norm(o) for o in co}
+            for o in [o for o in co if _norm(o) not in pn_]:
+                ev.append({"k": "+", "g": -1 if bad else 0, "c": "finding", "t": f"New {sev.lower()} finding — {cat}: {o}"})
+            for o in [o for o in po if _norm(o) not in cn_]:
+                ev.append({"k": "-", "g": 1 if bad else 0, "c": "finding", "t": f"Resolved {sev.lower()} finding — {cat}: {o}"})
+        if ev:
+            out[a] = ev
+    return out
+
+
+def attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state):
+    prev = {r["asn"]: r for r in prev_rows}
+    for r in rows:
+        pv = prev.get(r["asn"])
+        for k in DELTA_FIELDS:
+            a, b = (pv or {}).get(k), r.get(k)
+            r["d_" + k] = round(b - a, 1) if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b != a else None
+        r["status_prev"] = (pv or {}).get("roa_status")
+        ev = events.get(str(r["asn"]), [])
+        r["changes"] = ev[:60]
+        r["changes_more"] = max(0, len(ev) - 60)
+        r["chg_plus"] = sum(e["k"] == "+" for e in ev)
+        r["chg_minus"] = sum(e["k"] == "-" for e in ev)
+        r["chg_other"] = sum(e["k"] == "~" for e in ev)
+        r["chg_total"] = len(ev)
+        r["chg_good"] = sum(e["g"] > 0 for e in ev)
+        r["chg_bad"] = sum(e["g"] < 0 for e in ev)
+    pf = prev_state["asns"] if prev_state else {}
+    for f in F:
+        key = f"{f['severity']}|{f['category']}"
+        po = pf.get(str(f["asn"]), {}).get("f", {}).get(key)
+        if not prev_state:
+            f["is_new"] = "no"
+        elif po is None:
+            f["is_new"] = "yes"
+        elif any(o.startswith("__count__") for o in po):
+            f["is_new"] = "no"
+        else:
+            pn_ = {_norm(o) for o in po}
+            f["is_new"] = "yes" if any(_norm(o) not in pn_ for o in f["_objs"]) else "no"
+    pa = {int(a): set(s["aspa"]) for a, s in pf.items()}
+    for x in ASP:
+        ev = [e for e in events.get(str(x["customer"]), []) if e["c"] == "aspa"]
+        x["changes"] = ev
+        x["chg_total"] = len(ev)
+    flat = []
+    names = {r["asn"]: r["name"] for r in rows} | {r["asn"]: r["name"] for r in prev_rows if r["asn"] not in {x["asn"] for x in rows}}
+    order = {"status": 0, "route": 1, "finding": 2, "aspa": 3, "roa": 4, "asn": 5}
+    for a, ev in events.items():
+        for i, e in enumerate(ev):
+            flat.append({"id": f"{a}-{i}", "asn": int(a), "name": names.get(int(a), ""), "kind": e["k"], "good": e["g"],
+                         "area": {"status": "Route validity", "route": "Announcement", "finding": "Finding", "aspa": "ASPA",
+                                  "roa": "ROA", "asn": "ASN list"}[e["c"]], "text": e["t"], "_o": order[e["c"]]})
+    flat.sort(key=lambda e: (-abs(e["good"]), e["_o"], e["asn"]))
+    for e in flat:
+        del e["_o"]
+    return flat
 
 
 def headline(rows, F, raw):
@@ -352,8 +520,12 @@ def main():
     raw = json.load(open(args.from_raw)) if args.from_raw else collect()
     if args.save_raw:
         json.dump(raw, open(args.save_raw, "w"))
-    prev_path = os.path.join(args.out, "no_asns_rpki.json")
-    prev_rows = json.load(open(prev_path)) if os.path.exists(prev_path) else []
+    rd = lambda name, default: json.load(open(os.path.join(args.out, name))) if os.path.exists(os.path.join(args.out, name)) else default
+    prev_rows = rd("no_asns_rpki.json", [])
+    prev_meta = rd("meta.json", {})
+    prev_state = rd("state.json", None)
+    if prev_state is None and prev_rows:
+        prev_state = state_from_files(prev_rows, rd("no_vrps.json", []), rd("no_aspa.json", []), rd("no_findings.json", []), prev_meta)
     rows, V, ASP, F = analyze(raw, prev_rows)
     # sanity guard: refuse to overwrite good data with an obviously broken run
     routed = sum(r["routed"] == "yes" for r in rows)
@@ -361,17 +533,28 @@ def main():
         log(f"sanity check failed (routed={routed}, vrps={len(V)}); keeping previous data")
         sys.exit(1)
     dump = lambda name, obj: json.dump(obj, open(os.path.join(args.out, name), "w"), separators=(",", ":"), ensure_ascii=False)
+    cur_state = make_state(raw, rows, F)
+    events = diff_state(prev_state, cur_state) if prev_state else {}
+    changes = attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state)
+    for f in F:
+        del f["_objs"]
     dump("no_asns_rpki.json", rows)
     dump("no_vrps.json", V)
     dump("no_aspa.json", ASP)
     dump("no_findings.json", F)
+    dump("no_changes.json", changes)
+    dump("state.json", cur_state)
     h = headline(rows, F, raw)
     hist_path = os.path.join(args.out, "history.json")
     hist = json.load(open(hist_path)) if os.path.exists(hist_path) else []
     hist = [x for x in hist if x["date"] != h["date"]] + [h]
     hist.sort(key=lambda x: x["date"])
     dump("history.json", hist)
-    dump("meta.json", {**raw["meta"], "headline": h})
+    dump("meta.json", {**raw["meta"], "headline": h,
+                       "prev_generated": (prev_state or {}).get("generated"),
+                       "prev_rpki_buildtime": (prev_state or {}).get("rpki_buildtime"),
+                       "prev_headline": prev_meta.get("headline"),
+                       "changes_detail": "partial" if (prev_state or {}).get("partial") else ("full" if prev_state else "none")})
     log("done:", h)
 
 

@@ -23,6 +23,7 @@ Every announcement is validated per RFC 6811 against every VRP worldwide.
 - `scripts/build_data.py` collects the data and writes `docs/data/*.json`.
 - `docs/index.html` is the dashboard (static, no build step).
 - `docs/data/history.json` keeps one row of headline figures per day.
+- `docs/data/state.json` is the per-ASN snapshot the next run compares against; `docs/data/no_changes.json` lists what changed since the previous run.
 
 Run locally with `python scripts/build_data.py --out docs/data` (Python 3.10+, no dependencies),
 then serve `docs/` with any static web server.
