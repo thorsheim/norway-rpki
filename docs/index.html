@@ -232,9 +232,10 @@ window.dash = (function () {
     </div>
 
     <div class="nr-card nr-full" id="top-card">
-      <h2>Largest Norwegian networks</h2>
-      <p class="note">Top 20 by announced IPv4 space (counted in /24s). Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid.</p>
-      <div class="nr-tbox short">
+      <h2>Norwegian networks by size</h2>
+      <p class="note">Every routed Norwegian ASN, largest announced IPv4 space (counted in /24s) first. Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid. Click a column to sort.</p>
+      <div class="nr-tools"><input class="nr-search" id="top-search" type="search" placeholder="Search ASN or name…"><span class="nr-count" id="top-count"></span></div>
+      <div class="nr-tbox">
         <table data-source="asns" data-row-key="asn" id="top-table">
           <thead><tr>
             <th data-field="asn"><button>ASN</button></th>
@@ -637,7 +638,7 @@ window.dash = (function () {
   const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
   const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
 
-  setupTable('top-table', { sortKey: 'v4_24s', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
   setupTable('chg-table', { sortKey: 'good', sortDir: 'asc', search: 'chg-search', numeric: ['asn'] });
   setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
   setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
@@ -823,7 +824,7 @@ window.dash = (function () {
       { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
       { f: 'aspa', render: (td, x) => { td.textContent = x.aspa; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
       { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'chg_total', render: chgCell }
-    ], { key: 'asn', limit: 20 });
+    ], { key: 'asn', count: 'top-count' });
   }
 
   let _asnMap = null, _asnSrc = null;
