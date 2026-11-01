@@ -76,6 +76,14 @@ a { color: inherit; }
 .nr-tools { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-sm); }
 .nr-chip { appearance: none; font: inherit; font-size: var(--cds-font-size-caption); border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
 .nr-chip[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.nr-filters { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-md); align-items: flex-end; margin-bottom: var(--cds-gap-sm); }
+.nr-filters label { display: flex; flex-direction: column; gap: 3px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-filters label.nr-check { flex-direction: row; align-items: center; gap: 6px; color: var(--color-fg); padding-bottom: 7px; }
+.nr-select { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 8px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 8.5rem; }
+.nr-btn { appearance: none; font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
+.nr-btn:hover, .nr-select:hover { border-color: var(--color-fg-muted); }
+.nr-filters .nr-search { flex: none; width: 14rem; min-width: 0; max-width: 100%; }
+@media (max-width: 600px) { .nr-filters label:not(.nr-check) { flex: 1 1 calc(50% - var(--cds-gap-md)); } .nr-filters .nr-select, .nr-filters .nr-search { width: 100%; min-width: 0; } }
 .nr-search { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; }
 .nr-count { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .nr-tbox { max-height: 34rem; overflow: auto; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
@@ -234,7 +242,57 @@ window.dash = (function () {
     <div class="nr-card nr-full" id="top-card">
       <h2>Norwegian networks by size</h2>
       <p class="note">Every routed Norwegian ASN, largest announced IPv4 space (counted in /24s) first. Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid. Click a column to sort.</p>
-      <div class="nr-tools"><input class="nr-search" id="top-search" type="search" placeholder="Search ASN or name…"><span class="nr-count" id="top-count"></span></div>
+      <div class="nr-filters" id="top-filters">
+        <label>Search<input class="nr-search" id="top-search" type="search" placeholder="ASN or name…"></label>
+        <label>Route validity
+          <select class="nr-select" id="top-f-status">
+            <option value="">All networks</option>
+            <option value="All valid">All routes valid</option>
+            <option value="Partly valid">Partly valid</option>
+            <option value="None valid">No valid routes</option>
+          </select></label>
+        <label>Problem
+          <select class="nr-select" id="top-f-issue">
+            <option value="">Any</option>
+            <option value="invalid">Has RPKI-invalid routes</option>
+            <option value="notfound">Has routes without ROA</option>
+            <option value="high" data-needs="high">Has high-severity findings</option>
+            <option value="wide">Has wide maxLength ROAs</option>
+            <option value="clean" data-needs="high">No high or medium findings</option>
+          </select></label>
+        <label>ASPA
+          <select class="nr-select" id="top-f-aspa">
+            <option value="">Any</option>
+            <option value="yes">Published</option>
+            <option value="no">Not published</option>
+          </select></label>
+        <label>IPv4 size
+          <select class="nr-select" id="top-f-size">
+            <option value="0">Any size</option>
+            <option value="4">/22 or larger (4+ /24s)</option>
+            <option value="16">/20 or larger (16+ /24s)</option>
+            <option value="64">/18 or larger (64+ /24s)</option>
+            <option value="256">/16 or larger (256+ /24s)</option>
+          </select></label>
+        <label class="nr-check" data-needs="chg_total"><input type="checkbox" id="top-f-changed"> Changed since last update</label>
+        <label>Sort by
+          <select class="nr-select" id="top-sort">
+            <option value="size">IPv4 space</option>
+            <option value="cov">IPv4 space valid</option>
+            <option value="valid">Routes valid</option>
+            <option value="invalid">Invalid routes</option>
+            <option value="notfound">Routes without ROA</option>
+            <option value="high" data-needs="high">High-severity findings</option>
+            <option value="wide">Wide maxLength ROAs</option>
+            <option value="changes" data-needs="chg_total">Number of changes</option>
+            <option value="name">Network name</option>
+            <option value="asn">ASN</option>
+            <option value="custom" hidden>Column</option>
+          </select></label>
+        <button class="nr-btn" id="top-dir" type="button" aria-label="Reverse sort order">↓ Descending</button>
+        <button class="nr-btn" id="top-reset" type="button">Reset</button>
+        <span class="nr-count" id="top-count" style="padding-bottom:7px"></span>
+      </div>
       <div class="nr-tbox">
         <table data-source="asns" data-row-key="asn" id="top-table">
           <thead><tr>
@@ -244,6 +302,8 @@ window.dash = (function () {
             <th data-field="roa_status"><button>ROA status</button></th>
             <th data-field="cov_v4_pct"><button>IPv4 space valid</button></th>
             <th data-field="valid_pct"><button>Routes valid</button></th>
+            <th data-field="invalid" class="num"><button>Invalid</button></th>
+            <th data-field="notfound" class="num"><button>No ROA</button></th>
             <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
             <th data-field="aspa"><button>ASPA</button></th>
             <th data-field="high" class="num"><button>High</button></th>
@@ -594,6 +654,59 @@ window.dash = (function () {
   };
   const chgCell = (td, x) => changesBadge(td, x, x.changes, x.changes_more);
 
+  // ---------- filters and sort for the networks-by-size table
+  const TOP_SORTS = { size: ['v4_24s', 'desc'], cov: ['cov_v4_pct', 'asc'], valid: ['valid_pct', 'asc'], invalid: ['invalid', 'desc'],
+    notfound: ['notfound', 'desc'], high: ['high', 'desc'], wide: ['wide_maxlen_v4', 'desc'], changes: ['chg_total', 'desc'],
+    name: ['name', 'asc'], asn: ['asn', 'asc'] };
+  const topF = { status: '', issue: '', aspa: '', size: 0, changed: false };
+  function topFilter(r) {
+    if (topF.status && r.roa_status !== topF.status) return false;
+    if (topF.aspa && r.aspa !== topF.aspa) return false;
+    if (topF.size && (r.v4_24s || 0) < topF.size) return false;
+    if (topF.changed && !(r.chg_total > 0)) return false;
+    switch (topF.issue) {
+      case 'invalid': return r.invalid > 0;
+      case 'notfound': return r.notfound > 0;
+      case 'high': return r.high > 0;
+      case 'wide': return r.wide_maxlen_v4 > 0;
+      case 'clean': return !r.high && !r.medium;
+      default: return true;
+    }
+  }
+  function setupTopFilters() {
+    const st = tables['top-table'];
+    st.filter = topFilter;
+    const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+    on('top-f-status', 'change', e => { topF.status = e.target.value; render(); });
+    on('top-f-issue', 'change', e => { topF.issue = e.target.value; render(); });
+    on('top-f-aspa', 'change', e => { topF.aspa = e.target.value; render(); });
+    on('top-f-size', 'change', e => { topF.size = Number(e.target.value); render(); });
+    on('top-f-changed', 'change', e => { topF.changed = e.target.checked; render(); });
+    on('top-sort', 'change', e => { const v = TOP_SORTS[e.target.value]; if (v) { st.key = v[0]; st.dir = v[1]; render(); } });
+    on('top-dir', 'click', () => { st.dir = st.dir === 'asc' ? 'desc' : 'asc'; render(); });
+    on('top-reset', 'click', () => {
+      Object.assign(topF, { status: '', issue: '', aspa: '', size: 0, changed: false });
+      ['top-f-status', 'top-f-issue', 'top-f-aspa'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('top-f-size').value = '0';
+      document.getElementById('top-f-changed').checked = false;
+      const q = document.getElementById('top-search'); q.value = ''; st.q = '';
+      st.key = 'v4_24s'; st.dir = 'desc'; render();
+    });
+  }
+  function syncTopControls(rows) {
+    const st = tables['top-table'];
+    const match = Object.entries(TOP_SORTS).find(([, v]) => v[0] === st.key);
+    const sel = document.getElementById('top-sort');
+    sel.querySelector('option[value="custom"]').hidden = !!match;
+    sel.value = match ? match[0] : 'custom';
+    document.getElementById('top-dir').textContent = st.dir === 'asc' ? '↑ Ascending' : '↓ Descending';
+    // hide options whose data is not in this dataset
+    document.querySelectorAll('#top-filters [data-needs]').forEach(el => {
+      const f = el.dataset.needs; const has = rows.some(r => r[f] != null);
+      if (el.tagName === 'OPTION') el.hidden = !has; else el.style.display = has ? '' : 'none';
+    });
+  }
+
   // Generic sortable/searchable table
   const tables = {};
   function setupTable(id, opts) {
@@ -638,7 +751,8 @@ window.dash = (function () {
   const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
   const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
 
-  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'invalid', 'notfound', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTopFilters();
   setupTable('chg-table', { sortKey: 'good', sortDir: 'asc', search: 'chg-search', numeric: ['asn'] });
   setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
   setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
@@ -821,10 +935,13 @@ window.dash = (function () {
     drawTable('top-table', s.data.filter(r => r.routed === 'yes'), [
       { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numD('v4_24s', 0, 'announced IPv4 /24s', ['route']) }, { f: 'roa_status', render: statusCell },
       { f: 'cov_v4_pct', render: covD('cov_v4_pct', 1, 'IPv4 space valid', ['route', 'status']) }, { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
+      { f: 'invalid', cls: 'num', render: (td, x) => { numD('invalid', -1, 'invalid routes', ['route', 'finding'])(td, x); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
+      { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'routes without ROA', ['route']) },
       { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
       { f: 'aspa', render: (td, x) => { td.textContent = x.aspa; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
       { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'chg_total', render: chgCell }
     ], { key: 'asn', count: 'top-count' });
+    syncTopControls(s.data);
   }
 
   let _asnMap = null, _asnSrc = null;
