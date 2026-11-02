@@ -391,7 +391,7 @@ def diff_state(prev, cur):
             ra, rb = STATUS_RANK.get(p["st"]), STATUS_RANK.get(c["st"])
             g = 0 if ra is None or rb is None else (1 if rb > ra else -1)
             ev.append({"k": "~", "g": g, "c": "status", "t": f"Route validity: {p['st']} → {c['st']}"})
-        if p["ann"] is not None:
+        if p["ann"] is not None and c["ann"] is not None:
             for pf in sorted(set(c["ann"]) - set(p["ann"])):
                 s = c["ann"][pf]
                 ev.append({"k": "+", "g": {"V": 1, "N": 0, "I": -1}[s], "c": "route", "t": f"Now announces {pf} ({ROV_NAME[s]})"})
@@ -425,16 +425,17 @@ def diff_state(prev, cur):
             sev, cat = key.split("|", 1)
             bad = sev in ("High", "Medium")
             po, co = p["f"].get(key, []), c["f"].get(key, [])
-            partial = any(o.startswith("__count__") for o in po)
-            if partial:  # previous objects unknown: compare at category level
-                pn = sum(int(o[9:]) for o in po)
+            partial = any(o.startswith("__count__") for o in po + co)
+            if partial:  # objects unknown on one side: compare at category level
+                cnt = lambda L: sum(int(o[9:]) if o.startswith("__count__") else 1 for o in L)
+                pn = cnt(po)
                 if not co:
                     ev.append({"k": "-", "g": 1 if bad else 0, "c": "finding", "t": f"Resolved: {cat} ({sev})"})
                 elif not po:
                     ev.append({"k": "+", "g": -1 if bad else 0, "c": "finding", "t": f"New finding: {cat} ({sev})"})
-                elif pn != len(co):
-                    ev.append({"k": "~", "g": (1 if len(co) < pn else -1) if bad else 0, "c": "finding",
-                               "t": f"{cat} ({sev}): {pn} → {len(co)} objects"})
+                elif pn != cnt(co):
+                    ev.append({"k": "~", "g": (1 if cnt(co) < pn else -1) if bad else 0, "c": "finding",
+                               "t": f"{cat} ({sev}): {pn} → {cnt(co)} objects"})
                 continue
             pn_, cn_ = {_norm(o) for o in po}, {_norm(o) for o in co}
             for o in [o for o in co if _norm(o) not in pn_]:
@@ -495,6 +496,30 @@ def attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state):
     return flat
 
 
+LOG_DAYS = 30
+
+
+def local_date(ts):
+    """Calendar date of a UTC timestamp in Norway."""
+    t = dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        t = t.astimezone(ZoneInfo("Europe/Oslo"))
+    except Exception:
+        pass
+    return t.strftime("%Y-%m-%d")
+
+
+def update_changes_log(log, generated, prev_generated, detail, events, days=LOG_DAYS):
+    """Rolling log: one entry per run, each with the changes since the run before it; keeps `days` calendar days."""
+    runs = [r for r in log.get("runs", []) if r["generated"] != generated]
+    runs.append({"date": local_date(generated), "generated": generated, "prev_generated": prev_generated,
+                 "detail": detail, "events": events})
+    runs.sort(key=lambda r: r["generated"])
+    cutoff = (dt.datetime.strptime(local_date(generated), "%Y-%m-%d") - dt.timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    return {"days": days, "runs": [r for r in runs if r["date"] >= cutoff]}
+
+
 def headline(rows, F, raw):
     R = [r for r in rows if r["routed"] == "yes"]
     s = lambda k: sum(r[k] or 0 for r in R)
@@ -543,6 +568,10 @@ def main():
     dump("no_aspa.json", ASP)
     dump("no_findings.json", F)
     dump("no_changes.json", changes)
+    chglog = update_changes_log(rd("changes_log.json", {"runs": []}), raw["meta"]["generated"],
+                             (prev_state or {}).get("generated"),
+                             "partial" if (prev_state or {}).get("partial") else "full", changes) if prev_state else rd("changes_log.json", {"runs": []})
+    dump("changes_log.json", chglog)
     dump("state.json", cur_state)
     h = headline(rows, F, raw)
     hist_path = os.path.join(args.out, "history.json")

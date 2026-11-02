@@ -129,6 +129,11 @@ a { color: inherit; }
 .nr-tipbox .sg { flex: none; width: 1em; text-align: center; font-weight: 700; }
 .sg.good { color: var(--color-ok); } .sg.bad { color: var(--color-bad); } .sg.neutral { color: var(--color-fg-muted); }
 .nr-tipbox .more { margin-top: 5px; color: var(--color-fg-muted); }
+.nr-daily { position: relative; min-height: 230px; }
+.nr-daily .bar { cursor: pointer; }
+.nr-daily-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: var(--cds-gap-sm); }
+.nr-daily-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.nr-day-head td { background: var(--color-bg); font-weight: 600; color: var(--color-fg); position: sticky; top: 33px; z-index: 0; }
 .nr-chg-sum { margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .nr-chg-sum .nr-d { margin-left: 0; }
 .nr-chg-sum button { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--color-fg); text-decoration: underline; cursor: pointer; }
@@ -137,7 +142,7 @@ a { color: inherit; }
 // Minimal runtime: loads the published JSON files and offers the small API the page uses.
 window.dash = (function () {
   const files = { asns: 'data/no_asns_rpki.json', vrps: 'data/no_vrps.json', aspa: 'data/no_aspa.json',
-                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/no_changes.json' };
+                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/no_changes.json', changeslog: 'data/changes_log.json' };
   const state = {}, calcs = {}, subs = [];
   Object.keys(files).forEach(id => { state[id] = { status: 'loading', data: [] }; });
   const notify = () => subs.forEach(f => { try { f(); } catch (e) { console.error(e); } });
@@ -317,22 +322,31 @@ window.dash = (function () {
 
   <!-- CHANGES -->
   <section class="nr-panel" data-panel="changes" id="changes" hidden>
+    <div class="nr-card nr-full" id="daily-card">
+      <h2>Changes per day, last 30 days</h2>
+      <p class="note">Number of changes found by each day's update. Click a day to list its changes below; hover for the counts.</p>
+      <div data-source="changeslog" id="daily-chart" class="nr-daily"></div>
+      <div class="nr-daily-legend"><span><i style="background:var(--cds-chart-status-critical)"></i>Worse</span><span><i style="background:var(--color-ok)"></i>Better</span><span><i style="background:var(--cds-chart-muted)"></i>Neutral</span><span id="daily-partial-note"></span></div>
+    </div>
     <div class="nr-card nr-full">
-      <h2>What changed since the previous update</h2>
-      <p class="note" id="chg-note">Every change per ASN between the two most recent updates: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.</p>
-      <div class="nr-tools">
-        <div id="chg-chips" style="display:flex;gap:6px;flex-wrap:wrap">
+      <h2 id="chg-title">Change log</h2>
+      <p class="note" id="chg-note">Every change per ASN, day by day: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.</p>
+      <div class="nr-filters">
+        <label>Day
+          <select class="nr-select" id="chg-day"><option value="">All 30 days</option></select></label>
+        <label>Search<input class="nr-search" id="chg-search" type="search" placeholder="ASN, name, prefix…"></label>
+        <div id="chg-chips" style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:4px">
           <button class="nr-chip" aria-pressed="true" data-g="">All</button>
           <button class="nr-chip" aria-pressed="false" data-g="-1">Regressions</button>
           <button class="nr-chip" aria-pressed="false" data-g="1">Improvements</button>
           <button class="nr-chip" aria-pressed="false" data-g="0">Neutral</button>
         </div>
-        <input class="nr-search" id="chg-search" type="search" placeholder="Search ASN, name, prefix…">
-        <span class="nr-count" id="chg-count"></span>
+        <span class="nr-count" id="chg-count" style="padding-bottom:7px"></span>
       </div>
       <div class="nr-tbox">
-        <table data-source="changes" data-row-key="id" id="chg-table">
+        <table data-source="changeslog" data-row-key="id" id="chg-table">
           <thead><tr>
+            <th data-field="date"><button>Date</button></th>
             <th data-field="good"><button>Change</button></th>
             <th data-field="area"><button>Area</button></th>
             <th data-field="asn"><button>ASN</button></th>
@@ -453,7 +467,7 @@ window.dash = (function () {
         <li><b>Route validity:</b> each announcement is validated per RFC 6811 against every VRP worldwide: Valid, Invalid (wrong origin AS, or longer than maxLength) or NotFound.</li>
         <li><b>maxLength:</b> a ROA is flagged when maxLength is longer than the prefix <i>and</i> more-specifics in that range are not all announced. “Wide” is IPv4 4+ bits, “loose” 1–3 bits; IPv6 from 16 bits.</li>
         <li><b>Unannounced ROAs:</b> ROA prefixes with no announcement from that AS inside or around them. When another Norwegian AS announces the space, it is flagged as a likely migration leftover.</li>
-        <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab lists everything.</li>
+        <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab keeps a log of every change for the last 30 days, with a chart per day.</li>
         <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
       </ul>
       <h3>What this does not show</h3>
@@ -753,14 +767,15 @@ window.dash = (function () {
 
   setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'invalid', 'notfound', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
   setupTopFilters();
-  setupTable('chg-table', { sortKey: 'good', sortDir: 'asc', search: 'chg-search', numeric: ['asn'] });
+  setupTable('chg-table', { sortKey: 'date', sortDir: 'desc', search: 'chg-search', numeric: ['asn'] });
+  document.getElementById('chg-day').addEventListener('change', e => { chgDay = e.target.value; render(); });
   setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
   setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
   setupTable('asn-table', { sortKey: 'asn', sortDir: 'asc', search: 'asn-search', numeric: ['asn', 'prefixes_v4', 'prefixes_v6', 'valid', 'notfound', 'invalid', 'valid_pct', 'vrps', 'wide_maxlen_v4', 'loose_maxlen_v4', 'unannounced_vrps', 'high', 'medium', 'chg_total'] });
 
   document.querySelectorAll('#chg-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('#chg-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
-    const g = b.dataset.g; tables['chg-table'].filter = g === '' ? null : (x => x.good === Number(g)); render();
+    chgGood = b.dataset.g; render();
   }));
   document.querySelectorAll('#sev-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('#sev-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
@@ -831,24 +846,115 @@ window.dash = (function () {
       if (bad.length) badge(sum, `${bad.length} worse`, 'bad', () => ({ title: 'Regressions', lines: bad.map(fmtE) }));
       if (good.length) badge(sum, `${good.length} better`, 'good', () => ({ title: 'Improvements', lines: good.map(fmtE) }));
       if (neu.length) badge(sum, `${neu.length} neutral`, 'neutral', () => ({ title: 'Neutral changes', lines: neu.map(fmtE) }));
-      if (all.length) { const b = document.createElement('button'); b.textContent = 'See all changes'; b.addEventListener('click', () => showTab('changes', true)); sum.appendChild(b); }
+      { const b = document.createElement('button'); b.textContent = all.length ? 'See all changes · 30-day log' : '30-day change log'; b.addEventListener('click', () => showTab('changes', true)); sum.appendChild(b); }
     }
   }
 
-  function renderChanges() {
-    const s = state('changes'); if (s.status !== 'ok') return;
-    const m = state('meta');
-    const note = document.getElementById('chg-note');
-    note.textContent = (m.status === 'ok' && m.data.changes_detail === 'partial')
-      ? `Changes since ${prevLabel()}. That update predates detailed tracking, so findings are compared per type and announcements are not listed one by one; from the next update every prefix-level change is shown. Green is an improvement, red a regression, grey neutral.`
-      : `Every change per ASN since ${prevLabel()}: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.`;
-    const rows = s.data.map((e, i) => ({ ...e, _i: i }));
-    drawTable('chg-table', rows, [
-      { f: 'good', render: (td, x) => { const b = document.createElement('span'); b.className = 'nr-d ' + toneOf(x.good); b.style.marginLeft = '0'; b.style.cursor = 'default'; b.textContent = x.kind === '+' ? '+' : x.kind === '-' ? '−' : '~'; td.appendChild(b); } },
-      { f: 'area' }, { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'text', cls: 'wrap mono' }
-    ], { key: 'id', count: 'chg-count', sorter: (st) => st.key === 'good' ? ((a, b) => (st.dir === 'asc' ? 1 : -1) * (a.good - b.good) || a._i - b._i) : null });
+  let chgDay = '', chgGood = '';
+  const dayFmt = (d) => d3.utcFormat('%a %-d %b')(new Date(d + 'T00:00:00Z'));
+  function logRows() {
+    const s = state('changeslog'); if (s.status !== 'ok') return null;
+    const out = []; let i = 0;
+    (s.data.runs || []).forEach(run => run.events.forEach(e => out.push({ ...e, id: run.generated + '|' + e.id, date: run.date, generated: run.generated, detail: run.detail, _i: i++ })));
+    return out;
+  }
+  function logDays() {
+    const s = state('changeslog'); if (s.status !== 'ok' || !s.data.runs || !s.data.runs.length) return [];
+    const runs = s.data.runs, n = s.data.days || 30;
+    const last = new Date(runs[runs.length - 1].date + 'T00:00:00Z');
+    const days = [];
+    for (let k = n - 1; k >= 0; k--) {
+      const d = d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(last, -k));
+      const rs = runs.filter(r => r.date === d);
+      const ev = rs.flatMap(r => r.events);
+      days.push({ date: d, runs: rs.length, partial: rs.some(r => r.detail === 'partial'),
+        bad: ev.filter(e => e.good < 0).length, good: ev.filter(e => e.good > 0).length, neutral: ev.filter(e => e.good === 0).length,
+        asns: new Set(ev.map(e => e.asn)).size });
+    }
+    return days;
+  }
+  function renderDaily() {
+    const el = document.getElementById('daily-chart'); const s = state('changeslog');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const W = el.clientWidth; if (!W) return;
+    const days = logDays(); if (!days.length) { const p = document.createElement('div'); p.className = 'nr-fail'; p.textContent = 'The change log fills in with each daily update.'; el.appendChild(p); return; }
+    const H = 230, m = { t: 12, r: 8, b: 26, l: 8 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const y = d3.scaleLinear([0, d3.max(days, d => d.bad + d.good + d.neutral) || 1], [H - m.b, m.t]).nice();
+    const ticks = y.ticks(4);
+    const tmp = svg.append('text').attr('font-size', 'var(--cds-font-size-caption)').text(fmt(ticks[ticks.length - 1]));
+    m.l = tmp.node().getComputedTextLength() + 12; tmp.remove();
+    const x = d3.scaleBand(days.map(d => d.date), [m.l, W - m.r]).paddingInner(0.22).paddingOuter(0.05);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmt(d));
+    const every = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor(W / 70))));
+    svg.append('g').selectAll('text').data(days.filter((d, i) => (days.length - 1 - i) % every === 0)).join('text')
+      .attr('x', d => x(d.date) + x.bandwidth() / 2).attr('y', H - 7).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)')
+      .attr('font-size', 'var(--cds-font-size-caption)').text(d => d3.utcFormat('%-d %b')(new Date(d.date + 'T00:00:00Z')));
+    const colors = { bad: 'var(--cds-chart-status-critical)', good: 'var(--color-ok)', neutral: 'var(--cds-chart-muted)' };
+    const tip = d3.select(el).append('div').attr('class', 'nr-tip');
+    const g = svg.append('g');
+    days.forEach(d => {
+      const col = g.append('g').attr('class', 'bar').attr('opacity', chgDay && chgDay !== d.date ? 0.35 : 1);
+      let y0 = y(0);
+      ['bad', 'good', 'neutral'].forEach(k => {
+        if (!d[k]) return;
+        const h = y(0) - y(d[k]);
+        col.append('rect').attr('x', x(d.date)).attr('width', x.bandwidth()).attr('y', y0 - h).attr('height', Math.max(1, h - 1)).attr('rx', Math.min(3, x.bandwidth() / 3)).attr('fill', colors[k]);
+        y0 -= h;
+      });
+      if (!d.runs) col.append('rect').attr('x', x(d.date)).attr('width', x.bandwidth()).attr('y', y(0) - 2).attr('height', 2).attr('fill', 'var(--cds-chart-grid)');
+      col.append('rect').attr('x', x(d.date) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('y', m.t).attr('height', y(0) - m.t).attr('fill', 'transparent')
+        .on('mousemove', (ev) => {
+          const [px, py] = d3.pointer(ev, el); tip.html('');
+          tip.append('div').attr('class', 'k').text(dayFmt(d.date) + (d.partial ? ' · less detailed' : ''));
+          if (!d.runs) tip.append('div').text('No update this day');
+          else if (!(d.bad + d.good + d.neutral)) tip.append('div').text('No changes');
+          else {
+            tip.append('div').text(`${fmt(d.bad + d.good + d.neutral)} changes across ${d.asns} ASN${d.asns === 1 ? '' : 's'}`);
+            [['bad', 'worse'], ['good', 'better'], ['neutral', 'neutral']].forEach(([k, l]) => { if (d[k]) tip.append('div').text(`${fmt(d[k])} ${l}`).style('color', colors[k]); });
+            tip.append('div').attr('class', 'k').text('Click to list them');
+          }
+          const tw = tip.node().offsetWidth; tip.style('left', Math.min(Math.max(0, px + 12), W - tw) + 'px').style('top', Math.max(0, py - 60) + 'px').style('opacity', 1);
+        })
+        .on('mouseleave', () => tip.style('opacity', 0))
+        .on('click', () => { if (!d.runs) return; chgDay = chgDay === d.date ? '' : d.date; document.getElementById('chg-day').value = chgDay; render(); });
+    });
+    if (chgDay) {
+      const xs = x(chgDay); if (xs != null) svg.append('rect').attr('x', xs - 2).attr('width', x.bandwidth() + 4).attr('y', m.t - 4).attr('height', y(0) - m.t + 6).attr('rx', 4).attr('fill', 'none').attr('stroke', 'var(--color-fg)').attr('stroke-width', 1.5).attr('pointer-events', 'none');
+    }
+    const pn = document.getElementById('daily-partial-note');
+    pn.textContent = days.some(d => d.partial) ? 'Days marked “less detailed” in the hover compare findings per type only (before prefix-level tracking started).' : '';
   }
 
+  function renderChanges() {
+    renderDaily();
+    const rows = logRows(); if (!rows) return;
+    // day selector
+    const sel = document.getElementById('chg-day');
+    const days = logDays().filter(d => d.runs).reverse();
+    const want = [''].concat(days.map(d => d.date)).join(',');
+    if (sel.dataset.opts !== want) {
+      clear(sel);
+      const o0 = document.createElement('option'); o0.value = ''; o0.textContent = `All ${days.length} days with updates`; sel.appendChild(o0);
+      days.forEach(d => { const o = document.createElement('option'); o.value = d.date; o.textContent = `${dayFmt(d.date)} (${d.bad + d.good + d.neutral})`; sel.appendChild(o); });
+      sel.dataset.opts = want;
+    }
+    sel.value = chgDay;
+    const st = tables['chg-table'];
+    st.filter = (x) => (!chgDay || x.date === chgDay) && (chgGood === '' || x.good === Number(chgGood));
+    document.getElementById('chg-title').textContent = chgDay ? `Changes on ${dayFmt(chgDay)}` : 'Change log, last 30 days';
+    drawTable('chg-table', rows, [
+      { f: 'date', render: (td, x) => { td.textContent = dayFmt(x.date); td.style.whiteSpace = 'nowrap'; } },
+      { f: 'good', render: (td, x) => { const b = document.createElement('span'); b.className = 'nr-d ' + toneOf(x.good); b.style.marginLeft = '0'; b.style.cursor = 'default'; b.textContent = x.kind === '+' ? '+' : x.kind === '-' ? '−' : '~'; td.appendChild(b); } },
+      { f: 'area' }, { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'text', cls: 'wrap mono' }
+    ], { key: 'id', count: 'chg-count', sorter: (st) => {
+      if (st.key === 'date') return (a, b) => (st.dir === 'asc' ? 1 : -1) * a.date.localeCompare(b.date) || (st.dir === 'asc' ? a._i - b._i : (b.generated.localeCompare(a.generated) || a._i - b._i));
+      if (st.key === 'good') return (a, b) => (st.dir === 'asc' ? 1 : -1) * (a.good - b.good) || b.date.localeCompare(a.date) || a._i - b._i;
+      return null;
+    } });
+  }
 
   function renderStatus() {
     const el = document.getElementById('status-chart'); const s = state('status_mix');
