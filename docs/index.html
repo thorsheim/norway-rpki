@@ -134,6 +134,23 @@ a { color: inherit; }
 .nr-daily-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: var(--cds-gap-sm); }
 .nr-daily-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .nr-day-head td { background: var(--color-bg); font-weight: 600; color: var(--color-fg); position: sticky; top: 33px; z-index: 0; }
+.nr-pub-group { margin-top: var(--cds-gap-md); }
+.nr-pub-group:first-child { margin-top: 0; }
+.nr-pub-group h3 { font-size: var(--cds-font-size-caption); font-weight: 600; margin: 0 0 6px; display: flex; justify-content: space-between; gap: var(--cds-gap-sm); }
+.nr-pub-group h3 span { font-weight: 400; color: var(--color-fg-muted); white-space: nowrap; }
+.nr-pub-row { margin-bottom: 8px; }
+.nr-pub-row .t { display: flex; justify-content: space-between; gap: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); margin-bottom: 3px; align-items: baseline; }
+.nr-pub-row .t .h { overflow-wrap: anywhere; }
+.nr-pub-row .t .h code { font-size: 0.95em; }
+.nr-pub-row .t .h small { color: var(--color-fg-muted); margin-left: 6px; }
+.nr-pub-row .t .n { color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nr-pub-row .track { height: 8px; background: var(--cds-chart-grid); border-radius: 4px; overflow: hidden; }
+.nr-pub-row .fill { height: 100%; border-radius: 4px; min-width: 3px; }
+.nr-sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: var(--cds-gap-md); }
+.nr-src { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); font-size: var(--cds-font-size-caption); line-height: 1.5; background: var(--color-bg); }
+.nr-src a { font-weight: 600; font-size: var(--cds-font-size-body); }
+.nr-src .w { margin: 4px 0; }
+.nr-src .tm { color: var(--color-fg-muted); }
 .nr-chg-sum { margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .nr-chg-sum .nr-d { margin-left: 0; }
 .nr-chg-sum button { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--color-fg); text-decoration: underline; cursor: pointer; }
@@ -142,7 +159,7 @@ a { color: inherit; }
 // Minimal runtime: loads the published JSON files and offers the small API the page uses.
 window.dash = (function () {
   const files = { asns: 'data/no_asns_rpki.json', vrps: 'data/no_vrps.json', aspa: 'data/no_aspa.json',
-                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/no_changes.json', changeslog: 'data/changes_log.json' };
+                  findings: 'data/no_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/no_changes.json', changeslog: 'data/changes_log.json', publication: 'data/no_publication.json' };
   const state = {}, calcs = {}, subs = [];
   Object.keys(files).forEach(id => { state[id] = { status: 'loading', data: [] }; });
   const notify = () => subs.forEach(f => { try { f(); } catch (e) { console.error(e); } });
@@ -226,8 +243,8 @@ window.dash = (function () {
       </div>
       <div class="nr-card" id="ca-card">
         <h2>Where ROAs are published</h2>
-        <p class="note">ASNs with ROAs, by certificate authority model. Delegated CAs run their own CA and publication; an outage there makes ROAs disappear.</p>
-        <div data-source="ca_mix" id="ca-chart" class="nr-hbars"></div>
+        <p class="note">ROA prefixes naming a Norwegian ASN, by the repository that publishes them. A ROA is published by the certificate authority (CA) of whoever holds the address space, which is not always the network using it (provider-assigned or leased space). With a delegated CA the holder runs the CA itself; if it or its publication server stops working, its ROAs expire and routes lose protection. One ASN can appear under several repositories.</p>
+        <div data-source="publication" id="ca-chart" style="min-height:120px"></div>
       </div>
     </div>
 
@@ -317,6 +334,11 @@ window.dash = (function () {
           <tbody></tbody>
         </table>
       </div>
+    </div>
+    <div class="nr-card nr-full" id="sources-card">
+      <h2>Data sources</h2>
+      <p class="note">Everything on this page is computed from these public sources each night. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
+      <div data-source="meta" id="sources-list" class="nr-sources"></div>
     </div>
   </section>
 
@@ -440,7 +462,7 @@ window.dash = (function () {
             <th data-field="unannounced_vrps" class="num"><button>Unannounced VRPs</button></th>
             <th data-field="aspa_providers"><button>ASPA providers</button></th>
             <th data-field="upstreams_seen"><button>Upstream-side neighbours</button></th>
-            <th data-field="ca_model"><button>CA model</button></th>
+            <th data-field="ca_model"><button>ROAs published by</button></th>
             <th data-field="high" class="num"><button>High</button></th>
             <th data-field="medium" class="num"><button>Med</button></th>
             <th data-field="chg_total"><button>Changes</button></th>
@@ -460,7 +482,7 @@ window.dash = (function () {
         <li><b>What each AS announces:</b> exact prefixes from RIPEstat <i>announced-prefixes</i> (RIPE RIS), counting only routes seen by at least 10 RIS peers during the last day.</li>
         <li><b>ROAs and ASPAs:</b> the complete validated output (<i>rpki.json</i>) of the rpki-client console, covering all five RIR trust anchors. The time of the build is in Sources.</li>
         <li><b>Upstream-side neighbours:</b> RIPEstat <i>asn-neighbours</i> (left neighbours in RIS AS paths), with the number of RIS peers that see each link.</li>
-        <li><b>Where ROAs are published:</b> the repository hosts listed on each ASN's rpki-client console page.</li>
+        <li><b>Where ROAs are published:</b> the publication point (SIA) of every ROA and ASPA object on each ASN's rpki-client console page. Hosts are grouped as RIR/NIR-hosted CAs (e.g. rpki.ripe.net), delegated CAs that publish through an RIR service (RIPE NCC Publication as a Service, ARIN Repository Publication Service), and delegated CAs with their own or a third-party publication server.</li>
       </ul>
       <h3>How the checks work</h3>
       <ul>
@@ -597,7 +619,7 @@ window.dash = (function () {
     const lines = spec.lines || [];
     if (lines.length) {
       const ul = document.createElement('ul');
-      lines.slice(0, MAXL).forEach(e => {
+      lines.slice(0, spec.maxl || MAXL).forEach(e => {
         const li = document.createElement('li'); const sg = document.createElement('span');
         sg.className = 'sg ' + (e.g > 0 ? 'good' : e.g < 0 ? 'bad' : 'neutral');
         sg.textContent = e.k === '+' ? '+' : e.k === '-' ? '−' : '~'; li.appendChild(sg);
@@ -605,10 +627,10 @@ window.dash = (function () {
       });
       tipBox.appendChild(ul);
     }
-    const more = Math.max(0, lines.length - MAXL) + (spec.more || 0);
+    const more = Math.max(0, lines.length - (spec.maxl || MAXL)) + (spec.more || 0);
     if (more || spec.note) {
       const m = document.createElement('div'); m.className = 'more';
-      m.textContent = more ? `…and ${more} more — see the Changes tab.` : spec.note; tipBox.appendChild(m);
+      m.textContent = (more ? `…and ${more} more — ${spec.moreLabel || 'see the Changes tab'}.` : '') + (spec.note ? (more ? ' ' : '') + spec.note : ''); tipBox.appendChild(m);
     }
   }
   function showTip(el) {
@@ -977,6 +999,55 @@ window.dash = (function () {
     el.appendChild(lg);
   }
 
+  function renderPub() {
+    const el = document.getElementById('ca-chart'); const s = state('publication');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const order = ['Hosted CA at an RIR/NIR', 'Delegated CA, published by an RIR', 'Delegated CA, own or third-party publication'];
+    const col = { 'Hosted CA at an RIR/NIR': dash.colors[0], 'Delegated CA, published by an RIR': dash.colors[3], 'Delegated CA, own or third-party publication': dash.colors[2] };
+    const max = d3.max(s.data, r => r.vrps) || 1;
+    const asnRows = state('asns').status === 'ok' ? state('asns').data : [];
+    order.forEach(model => {
+      const rows = s.data.filter(r => r.model === model); if (!rows.length) return;
+      const g = document.createElement('div'); g.className = 'nr-pub-group';
+      const h = document.createElement('h3'); h.appendChild(document.createTextNode(model));
+      const nAsn = asnRows.filter(r => (r.ca_model || '').split('; ').includes(model)).length;
+      const sp = document.createElement('span'); sp.textContent = `${fmt(d3.sum(rows, r => r.vrps))} ROA prefixes · ${nAsn} ASNs`; h.appendChild(sp); g.appendChild(h);
+      rows.forEach(r => {
+        const row = document.createElement('div'); row.className = 'nr-pub-row';
+        const t = document.createElement('div'); t.className = 't';
+        const a = document.createElement('span'); a.className = 'h';
+        const c = document.createElement('code'); c.textContent = r.host; a.appendChild(c);
+        const sm = document.createElement('small'); sm.textContent = r.operator; a.appendChild(sm);
+        const n = document.createElement('span'); n.className = 'n';
+        n.textContent = `${fmt(r.vrps)} prefixes${r.aspas ? ` · ${fmt(r.aspas)} ASPA` : ''} · `;
+        badge(n, `${r.asns} ASN${r.asns === 1 ? '' : 's'}`, 'neutral', () => ({ title: `${r.host} — ${r.operator}`, lines: (r.asn_list || []).map(x => ({ k: '+', g: 0, t: x })), maxl: 24, moreLabel: 'see “ROAs published by” in the All ASNs tab', note: `${fmt(r.roas)} ROA objects with ${fmt(r.vrps)} prefixes${r.aspas ? `, ${r.aspas} ASPA objects` : ''}.` }));
+        t.appendChild(a); t.appendChild(n); row.appendChild(t);
+        const tr = document.createElement('div'); tr.className = 'track';
+        const f = document.createElement('div'); f.className = 'fill'; f.style.width = (100 * r.vrps / max) + '%'; f.style.background = col[model]; tr.appendChild(f);
+        row.appendChild(tr); g.appendChild(row);
+      });
+      el.appendChild(g);
+    });
+  }
+
+  function renderSources() {
+    const el = document.getElementById('sources-list'); const m = state('meta');
+    if (m.status === 'error') return fail(el);
+    clear(el); if (m.status !== 'ok') return;
+    const f = (t) => t ? d3.utcFormat('%-d %b %Y %H:%M UTC')(new Date(String(t).endsWith('Z') ? t : t + 'Z')) : null;
+    const extra = { rpki_buildtime: m.data.global_vrps ? `${fmt(m.data.global_vrps)} VRPs and ${fmt(m.data.global_aspas)} ASPAs worldwide in this build.` : '' };
+    const src = m.data.sources || [];
+    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt every night by a GitHub Action.', time: 'generated' }]).forEach(x => {
+      const d = document.createElement('div'); d.className = 'nr-src';
+      const a = document.createElement('a'); a.href = x.url; a.textContent = x.name; a.rel = 'noopener'; d.appendChild(a);
+      const w = document.createElement('div'); w.className = 'w'; w.textContent = x.what + (extra[x.time] ? ' ' + extra[x.time] : ''); d.appendChild(w);
+      const t = x.time && f(m.data[x.time]);
+      if (t) { const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = (x.time === 'rpki_buildtime' ? 'Validated data built ' : x.time === 'generated' ? 'This update ran ' : 'Data up to ') + t; d.appendChild(tm); }
+      el.appendChild(d);
+    });
+  }
+
   function hbars(elId, srcId, label, color) {
     const el = document.getElementById(elId); const s = state(srcId);
     if (s.status === 'error') return fail(el);
@@ -1095,7 +1166,8 @@ window.dash = (function () {
     if (cur === 'overview') {
       renderTrend();
       renderStatus();
-      hbars('ca-chart', 'ca_mix', r => r.ca_model, (r) => r.ca_model === 'RIPE NCC hosted' ? dash.colors[0] : r.ca_model.startsWith('Delegated') ? dash.colors[3] : dash.colors[1]);
+      renderPub();
+      renderSources();
       hbars('cat-chart', 'cat_mix', r => `${r.category} · ${r.severity}`, r => sevColor(r.severity));
       renderMaxlen();
       renderTop();

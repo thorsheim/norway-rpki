@@ -152,11 +152,21 @@ def collect():
     nbs = {a: (nb, qt) for a, nb, qt in pmap(neighbours, routed)}
 
     def hosts(a):
+        """Per object on the console page: [type, publication host, number of prefixes/providers]."""
         try:
             h = get(f"{CONSOLE}/AS{a}.html", as_json=False, tries=3, timeout=60)
         except Exception:
             return a, []
-        return a, sorted({m.group(1) for m in re.finditer(r'<a href="/([^/"]+)/[^"]+\.(?:roa|asa)\.html"', h)})
+        objs = []
+        for row in re.findall(r"<tr>(.*?)</tr>", h, flags=re.S):
+            m = re.search(r'<a href="/([^/"]+)/[^"]+\.(roa|asa)\.html"', row)
+            if not m:
+                continue
+            first = re.search(r"<pre>(.*?)</pre>", row, flags=re.S)
+            body = re.sub(r"<[^>]+>", " ", first.group(1)) if first else ""
+            n = len(re.findall(r"maxlen", body)) if m.group(2) == "roa" else len(re.findall(r"\b(?:AS)?\d+\b", body))
+            objs.append([m.group(2), m.group(1), n])
+        return a, objs
 
     log("publication hosts")
     need = [a for a in universe if a in vrp_by or a in aspa_by]
@@ -177,9 +187,60 @@ def collect():
             "v": [[r["prefix"], r["maxLength"], r.get("ta", "")] for r in vrp_by.get(a, [])],
             "aspa": aspa_by.get(a, []),
             "nb": nbs.get(a, ([], None))[0],
-            "ca": ca.get(a, []),
+            "ca": sorted({o[1] for o in ca.get(a, [])}),
+            "pubs": ca.get(a, []),
         }
     return raw
+
+
+# ---------------------------------------------------------------- publication points
+HOSTED, DELEG_RIR, DELEG_OWN = "Hosted CA at an RIR/NIR", "Delegated CA, published by an RIR", "Delegated CA, own or third-party publication"
+PUB_ORDER = {HOSTED: 0, DELEG_RIR: 1, DELEG_OWN: 2}
+PUB_HOSTS = {
+    "rpki.ripe.net": ("RIPE NCC hosted RPKI", HOSTED),
+    "rpki.arin.net": ("ARIN hosted RPKI", HOSTED),
+    "rpki.apnic.net": ("APNIC hosted RPKI", HOSTED),
+    "rpki.afrinic.net": ("AFRINIC hosted RPKI", HOSTED),
+    "repository.lacnic.net": ("LACNIC hosted RPKI", HOSTED),
+    "rpki-repo.registro.br": ("NIC.br hosted RPKI (NIR under LACNIC)", HOSTED),
+    "rpki-rsync.idnic.net": ("IDNIC hosted RPKI (Indonesian NIR under APNIC)", HOSTED),
+    "rpki-repository.nic.ad.jp": ("JPNIC hosted RPKI (NIR under APNIC)", HOSTED),
+    "rpki.cnnic.cn": ("CNNIC hosted RPKI (NIR under APNIC)", HOSTED),
+    "rpkica.twnic.tw": ("TWNIC hosted RPKI (NIR under APNIC)", HOSTED),
+    "rsync.paas.rpki.ripe.net": ("RIPE NCC Publication as a Service", DELEG_RIR),
+    "rpki-rps.arin.net": ("ARIN Repository Publication Service", DELEG_RIR),
+}
+
+
+def pub_host(h):
+    """(operator/description, model) for a repository host seen in an object's SIA."""
+    if h in PUB_HOSTS:
+        return PUB_HOSTS[h]
+    if h.endswith(".ipxo.com"):
+        return ("IPXO (IP leasing platform)", DELEG_OWN)
+    return ("Independent publication server", DELEG_OWN)
+
+
+def publication_table(raw, names):
+    agg = {}
+    for a, d in raw["asns"].items():
+        for typ, host, n in d.get("pubs") or [[("roa"), h, 0] for h in d.get("ca", [])]:
+            r = agg.setdefault(host, {"host": host, "operator": pub_host(host)[0], "model": pub_host(host)[1],
+                                      "roas": 0, "vrps": 0, "aspas": 0, "_asns": set()})
+            if typ == "roa":
+                r["roas"] += 1
+                r["vrps"] += n
+            else:
+                r["aspas"] += 1
+            r["_asns"].add(int(a))
+    out = []
+    for r in agg.values():
+        asns = sorted(r.pop("_asns"))
+        r["asns"] = len(asns)
+        r["asn_list"] = [f"AS{a} {names.get(str(a), '')}".strip() for a in asns]
+        out.append(r)
+    out.sort(key=lambda r: (PUB_ORDER[r["model"]], -r["vrps"], r["host"]))
+    return out
 
 
 # ---------------------------------------------------------------- analysis
@@ -197,13 +258,7 @@ def analyze(raw, prev_rows):
     allann = [(n, int(a)) for a, L in ann.items() for n, _ in L]
 
     def ca_model(hs):
-        if not hs:
-            return ""
-        if any(h in ("rsync.paas.rpki.ripe.net", "cloudie-repo.rpki.app") or "krill" in h for h in hs):
-            return "Delegated CA (own publication)"
-        if all(h == "rpki.ripe.net" for h in hs):
-            return "RIPE NCC hosted"
-        return "Hosted at other RIR / NIR"
+        return "; ".join(sorted({pub_host(h)[1] for h in hs}, key=lambda m: PUB_ORDER.get(m, 9)))
 
     rows, F, V, ASP = [], [], [], []
 
@@ -496,6 +551,14 @@ def attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state):
     return flat
 
 
+SOURCES = [
+    {"name": "rpki-client console", "url": "https://console.rpki-client.org/", "what": "All validated ROAs (VRPs) and ASPAs from the five RIR trust anchors (rpki.json), plus each ASN's object page, used for where the objects are published.", "time": "rpki_buildtime"},
+    {"name": "RIPEstat announced-prefixes", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/announced-prefixes", "what": "Exact prefixes each ASN announces, as seen by RIPE RIS route collectors (at least 10 RIS peers, last 24 hours).", "time": "ris_query"},
+    {"name": "RIPEstat asn-neighbours", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/asn-neighbours", "what": "Neighbours seen on the upstream side of each routed ASN in RIS AS paths, compared with ASPA provider sets.", "time": "nb_query"},
+    {"name": "RIPEstat country-resource-list", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/country-resource-list", "what": "ASNs that RIPE NCC has delegated to Norway (NO).", "time": None},
+    {"name": "ipverse asn-info", "url": "https://github.com/ipverse/asn-info", "what": "Network names for every ASN, and ASNs whose registry country is NO (added to the RIPE NCC list).", "time": None},
+]
+
 LOG_DAYS = 30
 
 
@@ -568,6 +631,7 @@ def main():
     dump("no_aspa.json", ASP)
     dump("no_findings.json", F)
     dump("no_changes.json", changes)
+    dump("no_publication.json", publication_table(raw, raw.get("names", {})))
     chglog = update_changes_log(rd("changes_log.json", {"runs": []}), raw["meta"]["generated"],
                              (prev_state or {}).get("generated"),
                              "partial" if (prev_state or {}).get("partial") else "full", changes) if prev_state else rd("changes_log.json", {"runs": []})
@@ -583,7 +647,8 @@ def main():
                        "prev_generated": (prev_state or {}).get("generated"),
                        "prev_rpki_buildtime": (prev_state or {}).get("rpki_buildtime"),
                        "prev_headline": prev_meta.get("headline"),
-                       "changes_detail": "partial" if (prev_state or {}).get("partial") else ("full" if prev_state else "none")})
+                       "changes_detail": "partial" if (prev_state or {}).get("partial") else ("full" if prev_state else "none"),
+                       "sources": SOURCES})
     log("done:", h)
 
 
