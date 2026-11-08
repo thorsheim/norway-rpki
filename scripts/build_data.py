@@ -226,16 +226,22 @@ def publication_table(raw, names):
     for a, d in raw["asns"].items():
         for typ, host, n in d.get("pubs") or [[("roa"), h, 0] for h in d.get("ca", [])]:
             r = agg.setdefault(host, {"host": host, "operator": pub_host(host)[0], "model": pub_host(host)[1],
-                                      "roas": 0, "vrps": 0, "aspas": 0, "_asns": set()})
+                                      "roas": 0, "vrps": 0, "aspas": 0, "_asns": set(), "_by": {}})
+            b = r["_by"].setdefault(int(a), [0, 0, 0])   # vrps, roa objects, aspa objects
             if typ == "roa":
                 r["roas"] += 1
                 r["vrps"] += n
+                b[0] += n
+                b[1] += 1
             else:
                 r["aspas"] += 1
+                b[2] += 1
             r["_asns"].add(int(a))
     out = []
     for r in agg.values():
         asns = sorted(r.pop("_asns"))
+        by = r.pop("_by")
+        r["by_asn"] = [[a, *by[a]] for a in asns]
         r["asns"] = len(asns)
         r["asn_list"] = [f"AS{a} {names.get(str(a), '')}".strip() for a in asns]
         out.append(r)
@@ -595,7 +601,8 @@ def headline(rows, F, raw):
             "v4_valid_pct": round(100 * s("v4_valid_24s") / max(1, s("v4_24s")), 2),
             "v6_valid_pct": round(100 * s("v6_valid_48s") / max(1, s("v6_48s")), 2),
             "aspa": sum(r["aspa"] == "yes" for r in rows), "aspa_routed": sum(r["aspa"] == "yes" for r in R),
-            "high": sum(f["severity"] == "High" for f in F)}
+            "high": sum(f["severity"] == "High" for f in F),
+            "high_routed": sum(f["severity"] == "High" and f["asn"] in {r["asn"] for r in R} for f in F)}
 
 
 def main():

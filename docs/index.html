@@ -100,6 +100,11 @@ a { color: inherit; }
 .nr-play .hd { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; margin-bottom: 3px; }
 .nr-play .hd span { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nr-play .ds { color: var(--color-fg-muted); }
+.nr-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-seg { display: inline-flex; border: 1px solid var(--color-border-line); border-radius: 999px; overflow: hidden; }
+.nr-seg button { appearance: none; border: 0; background: var(--color-bg); color: var(--color-fg); font: inherit; font-size: var(--cds-font-size-caption); padding: 4px 12px; cursor: pointer; }
+.nr-seg button + button { border-left: 1px solid var(--color-border-line); }
+.nr-seg button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); }
 .nr-search { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; }
 .nr-count { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .nr-tbox { max-height: 34rem; overflow: auto; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
@@ -215,6 +220,13 @@ window.dash = (function () {
     <h1 id="title">Norway RPKI: ROA &amp; ASPA posture</h1>
     <p class="nr-meta" id="meta-line">&nbsp;</p>
     <p class="nr-chg-sum" id="chg-sum"></p>
+    <div class="nr-scope" id="scope-bar"><span>Showing</span>
+      <span class="nr-seg" role="group" aria-label="Which ASNs to include">
+        <button type="button" data-scope="routed" aria-pressed="true">Routed ASNs</button>
+        <button type="button" data-scope="all" aria-pressed="false">All registered ASNs</button>
+      </span>
+      <span id="scope-note"></span>
+    </div>
     <p class="nr-take" id="takeaway">
       Every announcement from <span data-source="kpi" data-field="full" data-row="0" class="dash-skeleton">—</span> of
       <span data-source="kpi" data-field="routed" data-row="0" class="dash-skeleton">—</span> routed Norwegian ASNs is RPKI-valid, while
@@ -238,11 +250,11 @@ window.dash = (function () {
   <!-- OVERVIEW -->
   <section class="nr-panel" data-panel="overview" id="overview">
     <div class="nr-kpis">
-      <div class="nr-kpi"><div class="lab">Routed NO ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="kd" data-kd="routed"></div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered</div></div>
+      <div class="nr-kpi"><div class="lab">Routed NO ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="kd" data-kd="routed"></div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered · <span data-source="kpi" data-field="routed_v4" data-row="0">—</span> announce IPv4, <span data-source="kpi" data-field="routed_v6" data-row="0">—</span> IPv6</div></div>
       <div class="nr-kpi"><div class="lab">All routes valid</div><div class="val" data-source="kpi" data-field="full_share" data-row="0">—</div><div class="kd" data-kd="full_share"></div><div class="sub">share of routed ASNs</div></div>
       <div class="nr-kpi"><div class="lab">IPv4 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v4_cov" data-row="0">—</div><div class="kd" data-kd="v4_cov"></div><div class="sub">of announced Norwegian IPv4</div></div>
       <div class="nr-kpi"><div class="lab">IPv6 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v6_cov" data-row="0">—</div><div class="kd" data-kd="v6_cov"></div><div class="sub">of announced Norwegian IPv6</div></div>
-      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="kd" data-kd="aspa_all"></div><div class="sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
+      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="kd" data-kd="aspa_all"></div><div class="sub" id="aspa-sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
       <div class="nr-kpi"><div class="lab">High-severity findings</div><div class="val" data-source="kpi" data-field="high" data-row="0">—</div><div class="kd" data-kd="high"></div><div class="sub"><span data-source="kpi" data-field="invalid" data-row="0">—</span> invalid route(s) · <span data-source="kpi" data-field="medium" data-row="0">—</span> medium</div></div>
     </div>
 
@@ -498,7 +510,7 @@ window.dash = (function () {
   <section class="nr-panel" data-panel="asns" id="asns" hidden>
     <div class="nr-card nr-full">
       <h2>Every Norwegian-registered ASN</h2>
-      <p class="note">Click a column to sort. Unrouted ASNs had no announcement seen by at least 10 RIS peers. Upstream-side neighbours are what an ASPA for that AS would likely need to list.</p>
+      <p class="note">Click a column to sort. Use “All registered ASNs” at the top to include ASNs with no announcement seen by at least 10 RIS peers. Upstream-side neighbours are what an ASPA for that AS would likely need to list.</p>
       <div class="nr-tools"><input class="nr-search" id="asn-search" type="search" placeholder="Search ASN or name…"><span class="nr-count" id="asn-count"></span></div>
       <div class="nr-tbox">
         <table data-source="asns" data-row-key="asn" id="asn-table">
@@ -546,6 +558,8 @@ window.dash = (function () {
         <li><b>Route validity:</b> each announcement is validated per RFC 6811 against every VRP worldwide: Valid, Invalid (wrong origin AS, or longer than maxLength) or NotFound.</li>
         <li><b>maxLength:</b> a ROA is flagged when maxLength is longer than the prefix <i>and</i> more-specifics in that range are not all announced. “Wide” is IPv4 4+ bits, “loose” 1–3 bits; IPv6 from 16 bits.</li>
         <li><b>Unannounced ROAs:</b> ROA prefixes with no announcement from that AS inside or around them. When another Norwegian AS announces the space, it is flagged as a likely migration leftover.</li>
+        <li><b>Routed or all ASNs:</b> by default every figure, table, finding, recommendation and change covers only ASNs that currently announce at least one prefix seen by 10 or more RIS peers. The switch at the top includes the unrouted ASNs too; your choice is remembered in this browser.</li>
+        <li><b>Comparing with Cloudflare Radar:</b> Radar's “ASes” figure for a country adds the ASes announcing IPv4 to those announcing IPv6, so an AS that announces both is counted twice. Count the routed ASNs here the same way (IPv4 plus IPv6) to compare.</li>
         <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab keeps a log of every change for the last 30 days, with a chart per day.</li>
         <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
       </ul>
@@ -583,9 +597,12 @@ window.dash = (function () {
       const full = routed.filter(r => r.roa_status === 'All valid').length;
       const sum = (k) => routed.reduce((t, r) => t + (r[k] || 0), 0);
       const v4 = sum('v4_24s'), v4c = sum('v4_valid_24s'), v6 = sum('v6_48s'), v6c = sum('v6_valid_48s');
+      const routedSet = new Set(routed.map(r => r.asn));
       return [{
         registered: asns.length,
         routed: routed.length,
+        routed_v4: routed.filter(r => r.prefixes_v4 > 0).length,
+        routed_v6: routed.filter(r => r.prefixes_v6 > 0).length,
         full,
         partial: routed.filter(r => r.roa_status === 'Partly valid').length,
         none: routed.filter(r => r.roa_status === 'None valid').length,
@@ -596,7 +613,9 @@ window.dash = (function () {
         aspa_all: asns.filter(r => r.aspa === 'yes').length,
         aspa_routed: routed.filter(r => r.aspa === 'yes').length,
         high: findings.filter(f => f.severity === 'High').length,
-        medium: findings.filter(f => f.severity === 'Medium').length
+        medium: findings.filter(f => f.severity === 'Medium').length,
+        high_routed: findings.filter(f => f.severity === 'High' && routedSet.has(f.asn)).length,
+        medium_routed: findings.filter(f => f.severity === 'Medium' && routedSet.has(f.asn)).length
       }];
     }
   });
@@ -620,26 +639,28 @@ window.dash = (function () {
     }
   });
   dash.calc('cat_mix', {
-    inputs: ['findings'],
+    inputs: ['findings', 'asns'],
     title: 'Findings by type',
-    description: 'Number of findings per issue type and severity.',
-    fn: (findings) => {
+    description: 'Number of findings per issue type and severity, for all ASNs and for routed ASNs only.',
+    fn: (findings, asns) => {
       const rank = { High: 0, Medium: 1, Low: 2, Info: 3 };
-      const m = {};
-      findings.forEach(f => { const k = f.category + '\u0000' + f.severity; m[k] = (m[k] || 0) + 1; });
-      const rows = Object.keys(m).map(k => { const [category, severity] = k.split('\u0000'); return { category, severity, n: m[k] }; });
+      const routed = new Set(asns.filter(r => r.routed === 'yes').map(r => r.asn));
+      const m = {}, mr = {};
+      findings.forEach(f => { const k = f.category + '\u0000' + f.severity; m[k] = (m[k] || 0) + 1; if (routed.has(f.asn)) mr[k] = (mr[k] || 0) + 1; });
+      const rows = Object.keys(m).map(k => { const [category, severity] = k.split('\u0000'); return { category, severity, n: m[k], n_routed: mr[k] || 0 }; });
       return rows.sort((a, b) => rank[a.severity] - rank[b.severity] || b.n - a.n);
     }
   });
   dash.calc('maxlen_dist', {
-    inputs: ['vrps'],
+    inputs: ['vrps', 'asns'],
     title: 'maxLength reach',
     description: 'VRPs counted by how many bits maxLength extends past the prefix length, per address family.',
-    fn: (vrps) => {
+    fn: (vrps, asns) => {
+      const routed = new Set(asns.filter(r => r.routed === 'yes').map(r => r.asn));
       const buckets = ['exact', '+1–3', '+4–7', '+8–15', '+16+'];
       const b = (s) => s === 0 ? 'exact' : s <= 3 ? '+1–3' : s <= 7 ? '+4–7' : s <= 15 ? '+8–15' : '+16+';
       const rows = [];
-      ['IPv4', 'IPv6'].forEach(afi => buckets.forEach(k => rows.push({ afi, bucket: k, n: vrps.filter(v => v.afi === afi && b(v.spread) === k).length })));
+      ['IPv4', 'IPv6'].forEach(afi => buckets.forEach(k => { const m = vrps.filter(v => v.afi === afi && b(v.spread) === k); rows.push({ afi, bucket: k, n: m.length, n_routed: m.filter(v => routed.has(v.asn)).length }); }));
       return rows;
     }
   });
@@ -923,6 +944,26 @@ window.dash = (function () {
     }
   });
 
+  // ---------- scope: routed ASNs only (default) or all registered ASNs
+  let scope = 'routed';
+  try { const v = localStorage.getItem('nr-scope'); if (v === 'all' || v === 'routed') scope = v; } catch (e) {}
+  if (/[#&]all-asns\b/.test(location.hash)) scope = 'all';
+  const inScope = (asn) => scope === 'all' || ((asnMap().get(asn) || {}).routed === 'yes');
+  document.querySelectorAll('#scope-bar [data-scope]').forEach(b => b.addEventListener('click', () => {
+    scope = b.dataset.scope; try { localStorage.setItem('nr-scope', scope); } catch (e) {} render();
+  }));
+  function renderScope() {
+    const a = state('asns'); const rows = a.status === 'ok' ? a.data : [];
+    const nr = rows.filter(r => r.routed === 'yes').length;
+    document.querySelectorAll('#scope-bar [data-scope]').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.scope === scope ? 'true' : 'false');
+      if (rows.length) b.textContent = b.dataset.scope === 'routed' ? `Routed ASNs (${nr})` : `All registered ASNs (${rows.length})`;
+    });
+    document.getElementById('scope-note').textContent = rows.length ? (scope === 'routed'
+      ? `${rows.length - nr} registered ASNs announce nothing seen by at least 10 RIS peers and are left out of findings, recommendations, changes and tables.`
+      : 'Unrouted ASNs are included; they can still have ROAs, ASPAs and findings.') : '';
+  }
+
   // Generic sortable/searchable table
   const tables = {};
   function setupTable(id, opts) {
@@ -1001,13 +1042,20 @@ window.dash = (function () {
     const k = state('kpi');
     document.querySelectorAll('[data-source="kpi"]').forEach(el => {
       if (k.status === 'ok' && k.data && k.data[0]) {
-        const v = k.data[0][el.dataset.field];
+        const remap = scope === 'routed' ? { aspa_all: 'aspa_routed', high: 'high_routed', medium: 'medium_routed' } : {};
         const f = el.dataset.field;
+        const v = k.data[0][remap[f] || f];
         el.textContent = (f === 'full_share' || f === 'v4_cov' || f === 'v6_cov') ? pct(v) : fmt(v);
         el.classList.remove('dash-skeleton');
       } else if (k.status === 'error') { el.textContent = '—'; el.classList.remove('dash-skeleton'); }
       else el.textContent = '—';
     });
+  }
+
+  function renderAspaSub() {
+    const k = state('kpi'), el = document.getElementById('aspa-sub');
+    if (k.status !== 'ok' || !k.data[0]) return;
+    el.textContent = scope === 'routed' ? `routed ASNs · ${fmt(k.data[0].aspa_all)} including unrouted` : `${fmt(k.data[0].aspa_routed)} of them routed`;
   }
 
   function renderKpiDeltas() {
@@ -1017,7 +1065,8 @@ window.dash = (function () {
     if (m.status !== 'ok' || !m.data.prev_headline || !m.data.headline) return;
     const h = m.data.headline, p = m.data.prev_headline, rows = a.status === 'ok' ? a.data : [];
     const lab = (r) => `AS${r.asn} ${r.name}`;
-    const ev = (filter) => rows.flatMap(r => (r.changes || []).filter(filter).map(e => ({ ...e, t: `${lab(r)}: ${e.t}` })));
+    const ev = (filter) => rows.filter(r => inScope(r.asn)).flatMap(r => (r.changes || []).filter(filter).map(e => ({ ...e, t: `${lab(r)}: ${e.t}` })));
+    const R = scope === 'routed';
     const share = (o) => o.routed ? 100 * o.all_valid / o.routed : 0;
     const v6re = /[0-9a-f]{1,4}:[0-9a-f:]*\/\d+/i;
     const spec = {
@@ -1029,8 +1078,8 @@ window.dash = (function () {
         lines: () => rows.filter(r => r.d_cov_v4_pct).sort((x, y) => Math.abs(y.d_cov_v4_pct) - Math.abs(x.d_cov_v4_pct))
           .map(r => ({ k: '~', g: Math.sign(r.d_cov_v4_pct), t: `${lab(r)}: IPv4 space valid ${fmtN(r.cov_v4_pct - r.d_cov_v4_pct)}% → ${fmtN(r.cov_v4_pct)}%` })) },
       v6_cov: { cur: h.v6_valid_pct, prev: p.v6_valid_pct, dir: 1, pct: true, lines: () => ev(e => e.c === 'route' && v6re.test(e.t)) },
-      aspa_all: { cur: h.aspa, prev: p.aspa, dir: 1, pct: false, lines: () => ev(e => e.c === 'aspa') },
-      high: { cur: h.high, prev: p.high, dir: -1, pct: false, lines: () => ev(e => e.c === 'finding' && /high finding|\(High\)/.test(e.t)) }
+      aspa_all: { cur: R ? h.aspa_routed : h.aspa, prev: R ? p.aspa_routed : p.aspa, dir: 1, pct: false, lines: () => ev(e => e.c === 'aspa') },
+      high: { cur: R ? h.high_routed : h.high, prev: R ? p.high_routed : p.high, dir: -1, pct: false, lines: () => ev(e => e.c === 'finding' && /high finding|\(High\)/.test(e.t)) }
     };
     Object.entries(spec).forEach(([k, o]) => {
       const el = document.querySelector(`[data-kd="${k}"]`); if (!el || o.cur == null || o.prev == null) return;
@@ -1042,7 +1091,7 @@ window.dash = (function () {
     });
     const c = state('changes');
     if (c.status === 'ok') {
-      const all = c.data, fmtE = (e) => ({ k: e.kind, g: e.good, t: `AS${e.asn} ${e.name}: ${e.text}` });
+      const all = c.data.filter(e => inScope(e.asn)), fmtE = (e) => ({ k: e.kind, g: e.good, t: `AS${e.asn} ${e.name}: ${e.text}` });
       const good = all.filter(e => e.good > 0), bad = all.filter(e => e.good < 0), neu = all.filter(e => e.good === 0);
       const asns = new Set(all.map(e => e.asn)).size;
       sum.appendChild(document.createTextNode(all.length
@@ -1060,7 +1109,7 @@ window.dash = (function () {
   function logRows() {
     const s = state('changeslog'); if (s.status !== 'ok') return null;
     const out = []; let i = 0;
-    (s.data.runs || []).forEach(run => run.events.forEach(e => out.push({ ...e, id: run.generated + '|' + e.id, date: run.date, generated: run.generated, detail: run.detail, _i: i++ })));
+    (s.data.runs || []).forEach(run => run.events.forEach(e => { if (inScope(e.asn)) out.push({ ...e, id: run.generated + '|' + e.id, date: run.date, generated: run.generated, detail: run.detail, _i: i++ }); }));
     return out;
   }
   function logDays() {
@@ -1071,7 +1120,7 @@ window.dash = (function () {
     for (let k = n - 1; k >= 0; k--) {
       const d = d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(last, -k));
       const rs = runs.filter(r => r.date === d);
-      const ev = rs.flatMap(r => r.events);
+      const ev = rs.flatMap(r => r.events).filter(e => inScope(e.asn));
       days.push({ date: d, runs: rs.length, partial: rs.some(r => r.detail === 'partial'),
         bad: ev.filter(e => e.good < 0).length, good: ev.filter(e => e.good > 0).length, neutral: ev.filter(e => e.good === 0).length,
         asns: new Set(ev.map(e => e.asn)).size });
@@ -1181,7 +1230,7 @@ window.dash = (function () {
     const s = state('recs'); const play = document.getElementById('rec-play');
     if (s.status === 'error') { fail(play); return; }
     if (s.status !== 'ok') return;
-    const rows = s.data;
+    const rows = s.data.filter(r => inScope(r.asn));
     // playbook
     clear(play);
     const cats = [];
@@ -1255,10 +1304,16 @@ window.dash = (function () {
     clear(el); if (s.status !== 'ok') return;
     const order = ['Hosted CA at an RIR/NIR', 'Delegated CA, published by an RIR', 'Delegated CA, own or third-party publication'];
     const col = { 'Hosted CA at an RIR/NIR': dash.colors[0], 'Delegated CA, published by an RIR': dash.colors[3], 'Delegated CA, own or third-party publication': dash.colors[2] };
-    const max = d3.max(s.data, r => r.vrps) || 1;
-    const asnRows = state('asns').status === 'ok' ? state('asns').data : [];
+    const data = s.data.map(r => {
+      if (!r.by_asn) return r;
+      const b = r.by_asn.filter(x => inScope(x[0]));
+      return { ...r, vrps: d3.sum(b, x => x[1]), roas: d3.sum(b, x => x[2]), aspas: d3.sum(b, x => x[3]), asns: b.length,
+        asn_list: (r.asn_list || []).filter(t => inScope(Number(String(t).split(' ')[0].slice(2)))) };
+    }).filter(r => r.asns > 0);
+    const max = d3.max(data, r => r.vrps) || 1;
+    const asnRows = (state('asns').status === 'ok' ? state('asns').data : []).filter(r => inScope(r.asn));
     order.forEach(model => {
-      const rows = s.data.filter(r => r.model === model); if (!rows.length) return;
+      const rows = data.filter(r => r.model === model); if (!rows.length) return;
       const g = document.createElement('div'); g.className = 'nr-pub-group';
       const h = document.createElement('h3'); h.appendChild(document.createTextNode(model));
       const nAsn = asnRows.filter(r => (r.ca_model || '').split('; ').includes(model)).length;
@@ -1298,12 +1353,13 @@ window.dash = (function () {
     });
   }
 
-  function hbars(elId, srcId, label, color) {
+  function hbars(elId, srcId, label, color, key) {
     const el = document.getElementById(elId); const s = state(srcId);
     if (s.status === 'error') return fail(el);
     clear(el); if (s.status !== 'ok') return;
-    const max = d3.max(s.data, r => r.n) || 1;
-    s.data.forEach(r => {
+    const data = s.data.map(r => ({ ...r, n: key && r[key] != null ? r[key] : r.n })).filter(r => r.n > 0);
+    const max = d3.max(data, r => r.n) || 1;
+    data.forEach(r => {
       const row = document.createElement('div'); row.className = 'nr-hrow';
       const t = document.createElement('div'); t.className = 't';
       const a = document.createElement('span'); a.textContent = label(r); t.appendChild(a);
@@ -1319,12 +1375,13 @@ window.dash = (function () {
     const el = document.getElementById('maxlen-chart'); const s = state('maxlen_dist');
     if (s.status === 'error') return fail(el);
     clear(el); if (s.status !== 'ok') return;
+    const data = s.data.map(d => ({ ...d, n: scope === 'routed' && d.n_routed != null ? d.n_routed : d.n }));
     const W = el.clientWidth; if (!W) return;
     const H = 240; const m = { t: 28, r: 8, b: 26, l: 8 };
-    const buckets = Array.from(new Set(s.data.map(d => d.bucket)));
+    const buckets = Array.from(new Set(data.map(d => d.bucket)));
     const afis = ['IPv4', 'IPv6'];
     const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
-    const y = d3.scaleLinear([0, d3.max(s.data, d => d.n) || 1], [H - m.b, m.t]).nice();
+    const y = d3.scaleLinear([0, d3.max(data, d => d.n) || 1], [H - m.b, m.t]).nice();
     // left margin from widest tick
     const tmp = svg.append('g').attr('font-size', 'var(--cds-font-size-caption)');
     const ticks = y.ticks(4); let lw = 0;
@@ -1336,7 +1393,7 @@ window.dash = (function () {
     svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmt(d));
     const tip = d3.select(el).append('div').attr('class', 'nr-tip');
     const g = svg.append('g');
-    g.selectAll('rect').data(s.data).join('rect')
+    g.selectAll('rect').data(data).join('rect')
       .attr('x', d => x0(d.bucket) + x1(d.afi)).attr('width', Math.min(32, x1.bandwidth()))
       .attr('y', d => y(d.n)).attr('height', d => Math.max(0, y(0) - y(d.n))).attr('rx', 4)
       .attr('fill', d => d.afi === 'IPv4' ? dash.colors[0] : dash.colors[1])
@@ -1377,7 +1434,7 @@ window.dash = (function () {
   function renderFindings() {
     const s = state('findings'); if (s.status !== 'ok') return;
     const st = tables['find-table'];
-    drawTable('find-table', s.data, [
+    drawTable('find-table', s.data.filter(x => inScope(x.asn)), [
       { f: 'severity', render: (td, x) => { sevCell(td, x); if (x.is_new === 'yes') { const r = asnMap().get(x.asn); badge(td, 'New', x.severity === 'High' || x.severity === 'Medium' ? 'bad' : 'neutral', () => ({ title: `New since ${prevLabel()}`, lines: ((r && r.changes) || []).filter(e => e.c === 'finding' && e.t.includes(x.category)) })); } } }, { f: 'category' }, { f: 'asn', render: asCell('asn') }, { f: 'name' },
       { f: 'objects', cls: 'wrap mono' }, { f: 'detail', cls: 'wrap' }
     ], { key: 'id', count: 'find-count', sorter: (st) => st.key === 'severity' ? ((a, b) => { const c = SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.v4_24s - a.v4_24s || a.asn - b.asn; return st.dir === 'asc' ? c : -c; }) : null });
@@ -1385,7 +1442,7 @@ window.dash = (function () {
 
   function renderAspa() {
     const s = state('aspa'); if (s.status !== 'ok') return;
-    drawTable('aspa-table', s.data, [
+    drawTable('aspa-table', s.data.filter(x => inScope(x.customer)), [
       { f: 'customer', render: asCell('customer') }, { f: 'name' }, { f: 'routed' }, { f: 'providers', cls: 'wrap', render: (td, x) => { td.textContent = x.providers; changesBadge(td, x, x.changes); } },
       { f: 'provider_count', cls: 'num' }, { f: 'neighbours_seen', cls: 'wrap' },
       { f: 'unlisted_neighbours', render: (td, x) => { td.textContent = x.unlisted_neighbours; if (x.unlisted_neighbours) td.style.color = 'var(--color-warn)'; } },
@@ -1395,7 +1452,7 @@ window.dash = (function () {
 
   function renderAsns() {
     const s = state('asns'); if (s.status !== 'ok') return;
-    drawTable('asn-table', s.data, [
+    drawTable('asn-table', s.data.filter(x => inScope(x.asn)), [
       { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'routed' }, { f: 'roa_status', render: statusCell },
       { f: 'prefixes_v4', cls: 'num', render: numD('prefixes_v4', 0, 'IPv4 announcements', ['route']) }, { f: 'prefixes_v6', cls: 'num', render: numD('prefixes_v6', 0, 'IPv6 announcements', ['route']) },
       { f: 'valid', cls: 'num', render: numD('valid', 1, 'valid routes', ['route']) }, { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'NotFound routes', ['route']) },
@@ -1411,14 +1468,14 @@ window.dash = (function () {
   }
 
   function render() {
-    renderKpi(); renderMeta(); renderKpiDeltas();
+    renderScope(); renderKpi(); renderAspaSub(); renderMeta(); renderKpiDeltas();
     const cur = (document.querySelector('.nr-tab[aria-selected="true"]') || {}).dataset?.tab || 'overview';
     if (cur === 'overview') {
       renderTrend();
       renderStatus();
       renderPub();
       renderSources();
-      hbars('cat-chart', 'cat_mix', r => `${r.category} · ${r.severity}`, r => sevColor(r.severity));
+      hbars('cat-chart', 'cat_mix', r => `${r.category} · ${r.severity}`, r => sevColor(r.severity), scope === 'routed' ? 'n_routed' : 'n');
       renderMaxlen();
       renderTop();
     }
