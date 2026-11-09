@@ -1,9 +1,21 @@
 name: Daily data update
 
+# Target: one update every day at 08:00 Norwegian time (Europe/Oslo).
+# GitHub's own scheduler can start jobs hours late, so the most reliable trigger is an
+# external call to this workflow's workflow_dispatch endpoint at 08:00 with
+# inputs {"scheduled": "true"}. The two cron entries below are the fallback: 06:01 UTC is
+# 08:01 in summer (CEST), 07:01 UTC is 08:01 in winter (CET). The "Decide" step makes sure
+# only one update runs per day, never before 08:00 Norwegian time.
 on:
   schedule:
-    - cron: "23 5 * * *"   # every day 05:23 UTC
+    - cron: "1 6 * * *"
+    - cron: "1 7 * * *"
   workflow_dispatch:
+    inputs:
+      scheduled:
+        description: "Daily trigger: skip if today's 08:00 update has already run"
+        required: false
+        default: "false"
   push:
     branches: [main]
     paths-ignore: ["docs/data/**"]
@@ -20,28 +32,42 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Build datasets
-        if: github.event_name != 'push'
-        run: python scripts/build_data.py --out docs/data
+      - name: Decide whether to build new data
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULED: ${{ inputs.scheduled }}
+        run: python scripts/daily_gate.py >> "$GITHUB_OUTPUT"
+      - name: Build datasets (retries after 10 minutes on failure)
+        if: steps.gate.outputs.build == 'true'
+        run: |
+          for attempt in 1 2 3; do
+            python scripts/build_data.py --out docs/data && exit 0
+            echo "Attempt $attempt failed"; [ $attempt -lt 3 ] && sleep 600
+          done
+          exit 1
       - name: Commit data
-        if: github.event_name != 'push'
+        if: steps.gate.outputs.build == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/data
-          git diff --cached --quiet || git commit -m "Data update $(date -u +%Y-%m-%d)"
-          git push
+          git diff --cached --quiet || git commit -m "Data update $(TZ=Europe/Oslo date +'%Y-%m-%d %H:%M %Z')"
+          git pull --rebase -q && git push
       - uses: actions/configure-pages@v6
+        if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
       - uses: actions/upload-pages-artifact@v5
+        if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
         with:
           path: docs
       - id: deployment
+        if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
         uses: actions/deploy-pages@v5
     environment:
       name: github-pages

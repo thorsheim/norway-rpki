@@ -4,7 +4,7 @@ A public dashboard showing RPKI deployment for every Norwegian ASN: route-origin
 validity of every announcement, ROA quality (maxLength exposure, leftover ROAs) and
 ASPA records compared with observed upstreams.
 
-Live at **https://rpki.thorsheim.net/** — rebuilt every day by a GitHub Action (`.github/workflows/update.yml`).
+Live at **https://rpki.thorsheim.net/** — rebuilt every day at 08:00 Norwegian time by a GitHub Action (`.github/workflows/update.yml`).
 
 ## Data sources
 

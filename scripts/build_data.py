@@ -96,7 +96,7 @@ def rov(idx, prefix, origin):
 
 
 # ---------------------------------------------------------------- collection
-def collect():
+def collect(prev_rows=()):
     now = dt.datetime.now(dt.timezone.utc)
     log("downloading rpki.json")
     rpki = get(f"{CONSOLE}/rpki.json", timeout=900)
@@ -109,9 +109,16 @@ def collect():
         names[row["asn"]] = row["description"]
         if row["country-code"] == "NO":
             ipverse_no.add(int(row["asn"]))
-    cr = get(f"{RIPESTAT}/country-resource-list/data.json?resource=NO&sourceapp={SOURCEAPP}")
     rir_no = set()
-    for x in cr["data"]["resources"]["asn"]:
+    try:
+        cr = get(f"{RIPESTAT}/country-resource-list/data.json?resource=NO&sourceapp={SOURCEAPP}")
+        cr_asns = cr["data"]["resources"]["asn"]
+    except Exception as e:  # RIPEstat hiccup: reuse yesterday's RIPE NCC list rather than failing the run
+        cr_asns = [r["asn"] for r in prev_rows if r.get("in_rir_list") == "yes"]
+        log(f"country-resource-list failed ({e}); reusing {len(cr_asns)} ASNs from the previous run")
+        if not cr_asns:
+            raise
+    for x in cr_asns:
         s = str(x)
         if "-" in s:
             lo, hi = map(int, s.split("-"))
@@ -612,7 +619,8 @@ def main():
     ap.add_argument("--save-raw")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
-    raw = json.load(open(args.from_raw)) if args.from_raw else collect()
+    prev_path0 = os.path.join(args.out, "no_asns_rpki.json")
+    raw = json.load(open(args.from_raw)) if args.from_raw else collect(json.load(open(prev_path0)) if os.path.exists(prev_path0) else [])
     if args.save_raw:
         json.dump(raw, open(args.save_raw, "w"))
     rd = lambda name, default: json.load(open(os.path.join(args.out, name))) if os.path.exists(os.path.join(args.out, name)) else default

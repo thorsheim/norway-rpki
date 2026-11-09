@@ -366,7 +366,7 @@ window.dash = (function () {
     </div>
     <div class="nr-card nr-full" id="sources-card">
       <h2>Data sources</h2>
-      <p class="note">Everything on this page is computed from these public sources each night. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
+      <p class="note">Everything on this page is computed from these public sources every day at 08:00 Norwegian time. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
       <div data-source="meta" id="sources-list" class="nr-sources"></div>
     </div>
   </section>
@@ -686,10 +686,15 @@ window.dash = (function () {
   const tipBox = document.createElement('div'); tipBox.className = 'nr-tipbox'; tipBox.setAttribute('role', 'tooltip');
   document.body.appendChild(tipBox);
   const MAXL = 14;
+  // All times on the page are shown in Norwegian time (Europe/Oslo).
+  const toDate = (t) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(t)) ? t : t + 'Z');
+  const osloFmt = (opts) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Oslo', ...opts });
+  const oslo = (t, withDay = true) => t ? osloFmt(withDay ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(toDate(t)).replace(/,/g, '') : '—';
+  const osloDay = (d) => osloFmt({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(d).split('/').reverse().join('-');
   function prevLabel() {
     const m = state('meta');
     const t = m.status === 'ok' && m.data.prev_generated;
-    return t ? 'the update of ' + d3.utcFormat('%-d %b %H:%M UTC')(new Date(t)) : 'the previous update';
+    return t ? 'the update of ' + oslo(t) : 'the previous update';
   }
   function fillTip(spec) {
     clear(tipBox);
@@ -1340,10 +1345,10 @@ window.dash = (function () {
     const el = document.getElementById('sources-list'); const m = state('meta');
     if (m.status === 'error') return fail(el);
     clear(el); if (m.status !== 'ok') return;
-    const f = (t) => t ? d3.utcFormat('%-d %b %Y %H:%M UTC')(new Date(String(t).endsWith('Z') ? t : t + 'Z')) : null;
+    const f = (t) => t ? oslo(t) + ' Norwegian time' : null;
     const extra = { rpki_buildtime: m.data.global_vrps ? `${fmt(m.data.global_vrps)} VRPs and ${fmt(m.data.global_aspas)} ASPAs worldwide in this build.` : '' };
     const src = m.data.sources || [];
-    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt every night by a GitHub Action.', time: 'generated' }]).forEach(x => {
+    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt every day at 08:00 Norwegian time by a GitHub Action.', time: 'generated' }]).forEach(x => {
       const d = document.createElement('div'); d.className = 'nr-src';
       const a = document.createElement('a'); a.href = x.url; a.textContent = x.name; a.rel = 'noopener'; d.appendChild(a);
       const w = document.createElement('div'); w.className = 'w'; w.textContent = x.what + (extra[x.time] ? ' ' + extra[x.time] : ''); d.appendChild(w);
@@ -1518,8 +1523,16 @@ window.dash = (function () {
   function renderMeta() {
     const s = state('meta'); const el = document.getElementById('meta-line');
     if (s.status !== 'ok') return;
-    const f = (t) => t ? d3.utcFormat('%-d %b %Y %H:%M UTC')(new Date(t)) : '—';
-    el.textContent = `Updated daily. RPKI data built ${f(s.data.rpki_buildtime)} · routing data from RIPE RIS up to ${f(s.data.ris_query + (String(s.data.ris_query).endsWith('Z') ? '' : 'Z'))}`;
+    clear(el);
+    const now = new Date(), gen = toDate(s.data.generated);
+    const today = osloDay(now), genDay = osloDay(gen);
+    const nowH = Number(osloFmt({ hour: '2-digit', hourCycle: 'h23' }).format(now));
+    const next = nowH < 8 ? 'today at 08:00' : 'tomorrow at 08:00';
+    const b = document.createElement('b'); b.textContent = 'Updated every day at 08:00 Norwegian time.'; el.appendChild(b);
+    el.appendChild(document.createTextNode(` Last update ${genDay === today ? 'today ' + oslo(s.data.generated, false) : oslo(s.data.generated)} · next ${next}. ` +
+      `RPKI data built ${oslo(s.data.rpki_buildtime, genDay === osloDay(toDate(s.data.rpki_buildtime)) ? false : true)}, routing data up to ${oslo(s.data.ris_query, false)}.`));
+    const late = genDay !== today && nowH >= 10;
+    if (late) { const w = document.createElement('span'); w.style.color = 'var(--color-warn)'; w.textContent = ' Today’s update has not run yet.'; el.appendChild(w); }
   }
 
   dash.onData(render);
