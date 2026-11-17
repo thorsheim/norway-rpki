@@ -32,7 +32,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -44,21 +44,36 @@ jobs:
           EVENT: ${{ github.event_name }}
           SCHEDULED: ${{ inputs.scheduled }}
         run: python scripts/daily_gate.py >> "$GITHUB_OUTPUT"
-      - name: Build datasets (one retry after 5 minutes on failure)
+      - name: Build datasets per country (one retry after 5 minutes; a failed country does not stop the others)
         if: steps.gate.outputs.build == 'true'
+        id: build
+        env:
+          COUNTRIES: ${{ steps.gate.outputs.countries }}
         run: |
-          for attempt in 1 2; do
-            python scripts/build_data.py --out docs/data && exit 0
-            echo "Attempt $attempt failed"; [ $attempt -lt 2 ] && sleep 300
+          failed=""; done=""
+          for cc in $COUNTRIES; do
+            case $cc in NO) out=docs/data;; *) out=docs/$(echo $cc | tr A-Z a-z)/data;; esac
+            ok=""
+            for attempt in 1 2; do
+              echo "::group::$cc attempt $attempt"
+              python scripts/build_data.py --country $cc --out $out --rpki-file "$RUNNER_TEMP/rpki.json" && ok=1
+              echo "::endgroup::"
+              [ -n "$ok" ] && break
+              echo "$cc attempt $attempt failed"; [ $attempt -lt 2 ] && sleep 300
+            done
+            if [ -n "$ok" ]; then done="$done $cc"; else failed="$failed $cc"; fi
           done
-          exit 1
+          echo "done=${done# }" >> "$GITHUB_OUTPUT"
+          echo "failed=${failed# }" >> "$GITHUB_OUTPUT"
+          echo "Updated: ${done:- none}  Failed: ${failed:- none}"
       - name: Commit data
         if: steps.gate.outputs.build == 'true'
         run: |
+          python scripts/make_pages.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/data
-          git diff --cached --quiet || git commit -m "Data update $(TZ=Europe/Oslo date +'%Y-%m-%d %H:%M %Z')"
+          git add docs
+          git diff --cached --quiet || git commit -m "Data update $(TZ=Europe/Oslo date +'%Y-%m-%d %H:%M %Z') (${{ steps.build.outputs.done }})"
           git pull --rebase -q && git push
       - uses: actions/configure-pages@v6
         if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
@@ -69,6 +84,11 @@ jobs:
       - id: deployment
         if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
         uses: actions/deploy-pages@v5
+      - name: Report countries that could not be updated
+        if: steps.build.outputs.failed != ''
+        run: |
+          echo "::error::No new data for: ${{ steps.build.outputs.failed }} (the previous data stays online)"
+          exit 1
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

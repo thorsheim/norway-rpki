@@ -1,0 +1,1554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sweden RPKI</title>
+<meta name="description" content="Daily status of RPKI route-origin validation (ROA) and ASPA deployment for every Swedish ASN, with misconfigurations that put routes at risk.">
+<link rel="canonical" href="https://rpki.thorsheim.net/se/">
+<meta property="og:url" content="https://rpki.thorsheim.net/se/">
+<meta property="og:title" content="Sweden RPKI: ROA & ASPA posture">
+<meta property="og:description" content="Daily RPKI ROA and ASPA status for every Swedish network, with risky and faulty setups flagged.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23006aa7'/%3E%3Crect x='9' width='5' height='32' fill='%23fecc02'/%3E%3Crect y='13.5' width='32' height='5' fill='%23fecc02'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --font-anthropic-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-anthropic-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --color-bg: #faf9f6; --color-panel: #ffffff; --color-fg: #1d1c1a; --color-fg-muted: #6b6862;
+  --color-border-line: #e6e3dc; --color-ok: #1a7f4b; --color-warn: #a35f00; --color-bad: #c0352b;
+  --cds-text-secondary: #6b6862; --cds-border: #e6e3dc; --cds-surface-popover: #ffffff;
+  --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.12);
+  --cds-chart-grid: #eeebe5; --cds-chart-axis: #c9c5bc; --cds-chart-muted: #b9b5ac; --cds-chart-status-critical: #d4584a;
+  --cds-font-size-caption: 0.8125rem; --cds-font-size-body: 0.9375rem; --cds-font-size-heading: 1rem; --cds-font-size-title: 1.875rem;
+  --cds-font-weight-medium: 560;
+  --cds-gap-xs: 4px; --cds-gap-sm: 8px; --cds-gap-md: 16px; --cds-gap-lg: 24px; --cds-gap-xl: 32px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 12px; --cds-pad-lg: 18px; --cds-pad-xl: 28px;
+  --cds-radius: 10px; --cds-dur-slow: .3s;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1a1918; --color-panel: #232220; --color-fg: #ece9e3; --color-fg-muted: #a39f97;
+    --color-border-line: #36332f; --color-ok: #4cc38a; --color-warn: #e6a23c; --color-bad: #f07167;
+    --cds-text-secondary: #a39f97; --cds-border: #36332f; --cds-surface-popover: #2b2a27;
+    --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.5);
+    --cds-chart-grid: #2f2d2a; --cds-chart-axis: #4a4741; --cds-chart-muted: #5d5a54; --cds-chart-status-critical: #e8665a;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-anthropic-sans); }
+#dash-root { max-width: 1280px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 48px; }
+a { color: inherit; }
+.nr-meta { margin: 0 0 var(--cds-gap-sm); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-foot { margin-top: var(--cds-gap-xl); padding-top: var(--cds-gap-md); border-top: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.6; }
+.dash-skeleton { color: transparent !important; background: var(--cds-chart-grid); border-radius: 4px; }
+
+.nr { font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.nr-countries { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--cds-gap-sm); font-size: var(--cds-font-size-caption); }
+.nr-countries a { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border: 1px solid var(--color-border-line); border-radius: 999px; color: var(--color-fg); text-decoration: none; background: var(--color-panel); }
+.nr-countries a:hover { border-color: var(--color-fg-muted); }
+.nr-countries a[aria-current="page"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.nr-countries img { width: 16px; height: 16px; border-radius: 3px; display: block; }
+.nr-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0 0 var(--cds-gap-xs); }
+.nr-take { color: var(--color-fg-muted); font-size: var(--cds-font-size-body); margin: 0 0 var(--cds-gap-md); max-width: 60rem; line-height: 1.5; }
+.nr-take b, .nr b { font-weight: 600; }
+.nr-tabs { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); border-bottom: 1px solid var(--color-border-line); margin-bottom: var(--cds-gap-md); }
+.nr-tab { appearance: none; background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--cds-pad-sm) var(--cds-pad-md); font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg-muted); cursor: pointer; }
+.nr-tab[aria-selected="true"] { color: var(--color-fg); border-bottom-color: var(--color-fg); }
+.nr-panel[hidden] { display: none; }
+.nr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: var(--cds-gap-md); margin-bottom: var(--cds-gap-md); }
+.nr-kpi, .nr-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.nr-kpi .lab { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-kpi .val { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; margin: var(--cds-gap-xs) 0; min-height: 1.3em; }
+.nr-kpi .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); margin-bottom: var(--cds-gap-md); }
+.nr-card h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.nr-card .note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: 0 0 var(--cds-gap-md); line-height: 1.45; }
+.nr-full { margin-bottom: var(--cds-gap-md); }
+.nr-stack { display: flex; height: 28px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.nr-stack div { min-width: 2px; }
+.nr-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); margin-top: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); }
+.nr-legend span.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.nr-legend b { font-variant-numeric: tabular-nums; }
+.nr-hbars { display: grid; gap: var(--cds-gap-sm); min-height: 120px; }
+.nr-hrow .t { display: flex; justify-content: space-between; gap: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); margin-bottom: 3px; }
+.nr-hrow .t .n { font-variant-numeric: tabular-nums; color: var(--color-fg-muted); white-space: nowrap; }
+.nr-hrow .track { height: 10px; background: var(--cds-chart-grid); border-radius: 5px; overflow: hidden; }
+.nr-hrow .fill { height: 100%; border-radius: 5px; }
+.nr-sev { display: inline-block; font-size: var(--cds-font-size-caption); font-weight: 600; white-space: nowrap; }
+.nr-sev.High { color: var(--color-bad); } .nr-sev.Medium { color: var(--color-warn); } .nr-sev.Low { color: var(--color-fg-muted); } .nr-sev.Info { color: var(--color-fg-muted); font-weight: 400; }
+.nr-tools { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-sm); }
+.nr-chip { appearance: none; font: inherit; font-size: var(--cds-font-size-caption); border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.nr-chip[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.nr-filters { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-md); align-items: flex-end; margin-bottom: var(--cds-gap-sm); }
+.nr-filters label { display: flex; flex-direction: column; gap: 3px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-filters label.nr-check { flex-direction: row; align-items: center; gap: 6px; color: var(--color-fg); padding-bottom: 7px; }
+.nr-select { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 8px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 8.5rem; }
+.nr-btn { appearance: none; font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
+.nr-btn:hover, .nr-select:hover { border-color: var(--color-fg-muted); }
+.nr-filters .nr-search { flex: none; width: 14rem; min-width: 0; max-width: 100%; }
+@media (max-width: 600px) { .nr-filters label:not(.nr-check) { flex: 1 1 calc(50% - var(--cds-gap-md)); } .nr-filters .nr-select, .nr-filters .nr-search { width: 100%; min-width: 0; } }
+.nr-prio { display: inline-block; font-size: var(--cds-font-size-caption); font-weight: 600; white-space: nowrap; padding: 1px 8px; border-radius: 999px; }
+.nr-prio.p1 { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 13%, transparent); }
+.nr-prio.p2 { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 14%, transparent); }
+.nr-prio.p3, .nr-prio.p4 { color: var(--color-fg-muted); background: color-mix(in srgb, var(--color-fg-muted) 14%, transparent); }
+.nr-prio.p5 { color: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 12%, transparent); }
+.nr-rec-act { font-weight: 600; margin-bottom: 4px; }
+.nr-rec-steps { margin: 0; padding-left: 1.1rem; color: var(--color-fg); }
+.nr-rec-steps li { margin: 2px 0; overflow-wrap: anywhere; }
+.nr-rec-meta { margin-top: 5px; color: var(--color-fg-muted); }
+.nr-rec-meta a { color: inherit; }
+.nr-play { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--cds-gap-sm); min-height: 60px; }
+.nr-play button { appearance: none; text-align: left; font: inherit; font-size: var(--cds-font-size-caption); line-height: 1.45; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); padding: var(--cds-pad-sm) var(--cds-pad-md); cursor: pointer; }
+.nr-play button:hover, .nr-play button[aria-pressed="true"] { border-color: var(--color-fg); }
+.nr-play .hd { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; margin-bottom: 3px; }
+.nr-play .hd span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nr-play .ds { color: var(--color-fg-muted); }
+.nr-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-seg { display: inline-flex; border: 1px solid var(--color-border-line); border-radius: 999px; overflow: hidden; }
+.nr-seg button { appearance: none; border: 0; background: var(--color-bg); color: var(--color-fg); font: inherit; font-size: var(--cds-font-size-caption); padding: 4px 12px; cursor: pointer; }
+.nr-seg button + button { border-left: 1px solid var(--color-border-line); }
+.nr-seg button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); }
+.nr-search { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; }
+.nr-count { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.nr-tbox { max-height: 34rem; overflow: auto; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
+.nr-tbox.short { max-height: none; }
+.nr table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.nr th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); border-bottom: 1px solid var(--color-border-line); padding: 0; white-space: nowrap; z-index: 1; }
+.nr th button { appearance: none; border: 0; background: none; font: inherit; color: var(--color-fg-muted); padding: 8px 10px; cursor: pointer; width: 100%; text-align: inherit; }
+.nr th[aria-sort] button { color: var(--color-fg); }
+.nr th.num, .nr td.num { text-align: right; }
+.nr td { padding: 7px 10px; border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+.nr td.wrap { min-width: 14rem; max-width: 34rem; line-height: 1.4; }
+.nr td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; word-break: break-word; }
+.nr tr:last-child td { border-bottom: 0; }
+.nr-cov { display: flex; align-items: center; gap: 8px; min-width: 8rem; }
+.nr-cov .bar { flex: 1; height: 8px; background: var(--cds-chart-grid); border-radius: 4px; overflow: hidden; }
+.nr-cov .bar i { display: block; height: 100%; border-radius: 4px; }
+.nr-cov span { min-width: 3.2em; text-align: right; }
+.nr-chart { position: relative; min-height: 240px; }
+.nr-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); opacity: 0; white-space: nowrap; z-index: 3; }
+.nr-tip .k { color: var(--cds-text-secondary); }
+.nr-fail { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.nr-fail i { width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); display: inline-block; }
+.nr-method { max-width: 60rem; line-height: 1.55; font-size: var(--cds-font-size-body); }
+.nr-method h3 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: var(--cds-gap-lg) 0 var(--cds-gap-xs); }
+.nr-method ul { padding-left: 1.2rem; margin: var(--cds-gap-xs) 0; }
+.nr-method li { margin-bottom: 6px; }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.nr-d { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; line-height: 1.6; cursor: help; white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; font-family: var(--font-anthropic-sans); }
+.nr-d.good { color: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 14%, transparent); }
+.nr-d.bad { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 14%, transparent); }
+.nr-d.neutral { color: var(--color-fg-muted); background: color-mix(in srgb, var(--color-fg-muted) 15%, transparent); }
+.nr-d:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+.nr-kpi .kd { min-height: 1.5em; margin: -2px 0 2px; }
+.nr td.num { white-space: nowrap; }
+.nr-cov .bar { min-width: 48px; }
+.nr-cov .nr-d { margin-left: 2px; }
+.nr-kpi .kd .nr-d { margin-left: 0; }
+.nr-tipbox { position: fixed; display: none; z-index: 60; max-width: min(440px, calc(100vw - 16px)); background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: 8px 11px; font-size: var(--cds-font-size-caption); line-height: 1.45; pointer-events: none; color: var(--color-fg); }
+.nr-tipbox .tt { font-weight: 600; margin-bottom: 4px; }
+.nr-tipbox ul { list-style: none; margin: 0; padding: 0; }
+.nr-tipbox li { display: flex; gap: 6px; margin: 2px 0; overflow-wrap: anywhere; }
+.nr-tipbox .sg { flex: none; width: 1em; text-align: center; font-weight: 700; }
+.sg.good { color: var(--color-ok); } .sg.bad { color: var(--color-bad); } .sg.neutral { color: var(--color-fg-muted); }
+.nr-tipbox .more { margin-top: 5px; color: var(--color-fg-muted); }
+.nr-daily { position: relative; min-height: 230px; }
+.nr-daily .bar { cursor: pointer; }
+.nr-daily-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: var(--cds-gap-sm); }
+.nr-daily-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.nr-day-head td { background: var(--color-bg); font-weight: 600; color: var(--color-fg); position: sticky; top: 33px; z-index: 0; }
+.nr-pub-group { margin-top: var(--cds-gap-md); }
+.nr-pub-group:first-child { margin-top: 0; }
+.nr-pub-group h3 { font-size: var(--cds-font-size-caption); font-weight: 600; margin: 0 0 6px; display: flex; justify-content: space-between; gap: var(--cds-gap-sm); }
+.nr-pub-group h3 span { font-weight: 400; color: var(--color-fg-muted); white-space: nowrap; }
+.nr-pub-row { margin-bottom: 8px; }
+.nr-pub-row .t { display: flex; justify-content: space-between; gap: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); margin-bottom: 3px; align-items: baseline; }
+.nr-pub-row .t .h { overflow-wrap: anywhere; }
+.nr-pub-row .t .h code { font-size: 0.95em; }
+.nr-pub-row .t .h small { color: var(--color-fg-muted); margin-left: 6px; }
+.nr-pub-row .t .n { color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nr-pub-row .track { height: 8px; background: var(--cds-chart-grid); border-radius: 4px; overflow: hidden; }
+.nr-pub-row .fill { height: 100%; border-radius: 4px; min-width: 3px; }
+.nr-sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: var(--cds-gap-md); }
+.nr-src { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); font-size: var(--cds-font-size-caption); line-height: 1.5; background: var(--color-bg); }
+.nr-src a { font-weight: 600; font-size: var(--cds-font-size-body); }
+.nr-src .w { margin: 4px 0; }
+.nr-src .tm { color: var(--color-fg-muted); }
+.nr-chg-sum { margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.nr-chg-sum .nr-d { margin-left: 0; }
+.nr-chg-sum button { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--color-fg); text-decoration: underline; cursor: pointer; }
+</style>
+<script>
+// Minimal runtime: loads the published JSON files and offers the small API the page uses.
+window.dash = (function () {
+  const files = { asns: 'data/se_asns_rpki.json', vrps: 'data/se_vrps.json', aspa: 'data/se_aspa.json',
+                  findings: 'data/se_findings.json', history: 'data/history.json', meta: 'data/meta.json', changes: 'data/se_changes.json', changeslog: 'data/changes_log.json', publication: 'data/se_publication.json' };
+  const state = {}, calcs = {}, subs = [];
+  Object.keys(files).forEach(id => { state[id] = { status: 'loading', data: [] }; });
+  const notify = () => subs.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+  function runCalcs() {
+    Object.entries(calcs).forEach(([id, c]) => {
+      const ins = c.inputs.map(i => state[i] || { status: 'missing' });
+      if (ins.some(s => s.status === 'error')) state[id] = { status: 'error', data: [] };
+      else if (ins.every(s => s.status === 'ok')) {
+        try { state[id] = { status: 'ok', data: c.fn(...ins.map(s => s.data)) }; }
+        catch (e) { console.error(e); state[id] = { status: 'error', data: [] }; }
+      }
+    });
+  }
+  Promise.all(Object.entries(files).map(([id, url]) =>
+    fetch(url, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d => { state[id] = { status: 'ok', data: d }; })
+      .catch(e => { console.error(url, e); state[id] = { status: 'error', data: [] }; })
+  )).then(() => { runCalcs(); notify(); });
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(notify, 150); });
+  return {
+    data: id => state[id] || { status: 'missing', data: [] },
+    onData: f => { subs.push(f); f(); },
+    calc: (id, c) => { calcs[id] = c; state[id] = { status: 'loading', data: [] }; },
+    colors: ['#3b7dd8', '#1f9e74', '#d99a2b', '#8a63d2', '#d4584a', '#3fb6c9', '#c75b9b', '#7f8c4d'],
+    setLink: n => { try { history.replaceState(null, '', '#' + n); } catch (e) {} },
+    refresh() {}, params: () => ({}), setParams() {}, resetParams() {}
+  };
+})();
+</script>
+</head>
+<body>
+<div id="dash-root">
+
+
+<div class="nr">
+  <div class="nr-head">
+    <nav class="nr-countries" aria-label="Country"><a href="/"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ba0c2f'/%3E%3Crect x='9' width='5' height='32' fill='%23fff'/%3E%3Crect y='13.5' width='32' height='5' fill='%23fff'/%3E%3Crect x='10.25' width='2.5' height='32' fill='%2300205b'/%3E%3Crect y='14.75' width='32' height='2.5' fill='%2300205b'/%3E%3C/svg%3E" alt="">Norway</a><a href="/se/" aria-current="page"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23006aa7'/%3E%3Crect x='9' width='5' height='32' fill='%23fecc02'/%3E%3Crect y='13.5' width='32' height='5' fill='%23fecc02'/%3E%3C/svg%3E" alt="">Sweden</a><a href="/fi/"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23fff' stroke=%22%23c9c5bc%22 stroke-width=%221.5%22/%3E%3Crect x='8.5' width='6' height='32' fill='%23002f6c'/%3E%3Crect y='13' width='32' height='6' fill='%23002f6c'/%3E%3C/svg%3E" alt="">Finland</a><a href="/dk/"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8102e'/%3E%3Crect x='9.5' width='4' height='32' fill='%23fff'/%3E%3Crect y='14' width='32' height='4' fill='%23fff'/%3E%3C/svg%3E" alt="">Denmark</a></nav>
+    <h1 id="title">Sweden RPKI: ROA &amp; ASPA posture</h1>
+    <p class="nr-meta" id="meta-line">&nbsp;</p>
+    <p class="nr-chg-sum" id="chg-sum"></p>
+    <div class="nr-scope" id="scope-bar"><span>Showing</span>
+      <span class="nr-seg" role="group" aria-label="Which ASNs to include">
+        <button type="button" data-scope="routed" aria-pressed="true">Routed ASNs</button>
+        <button type="button" data-scope="all" aria-pressed="false">All registered ASNs</button>
+      </span>
+      <span id="scope-note"></span>
+    </div>
+    <p class="nr-take" id="takeaway">
+      Every announcement from <span data-source="kpi" data-field="full" data-row="0" class="dash-skeleton">—</span> of
+      <span data-source="kpi" data-field="routed" data-row="0" class="dash-skeleton">—</span> routed Swedish ASNs is RPKI-valid, while
+      <span data-source="kpi" data-field="none" data-row="0" class="dash-skeleton">—</span> have no valid route at all.
+      Only <span data-source="kpi" data-field="aspa_routed" data-row="0" class="dash-skeleton">—</span> routed ASNs publish ASPA.
+      <b><span data-source="kpi" data-field="high" data-row="0" class="dash-skeleton">—</span> high-severity findings</b> need attention first, including
+      <span data-source="kpi" data-field="invalid" data-row="0" class="dash-skeleton">—</span> RPKI-invalid route(s).
+    </p>
+  </div>
+
+  <div class="nr-tabs" role="tablist">
+    <button class="nr-tab" role="tab" aria-selected="true" data-tab="overview" id="tab-overview">Overview</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="changes" id="tab-changes">Changes</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="findings" id="tab-findings">Findings</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="recs" id="tab-recs">Recommendations</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="aspa" id="tab-aspa">ASPA</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="asns" id="tab-asns">All ASNs</button>
+    <button class="nr-tab" role="tab" aria-selected="false" data-tab="method" id="tab-method">Method &amp; caveats</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="nr-panel" data-panel="overview" id="overview">
+    <div class="nr-kpis">
+      <div class="nr-kpi"><div class="lab">Routed SE ASNs</div><div class="val" data-source="kpi" data-field="routed" data-row="0">—</div><div class="kd" data-kd="routed"></div><div class="sub">of <span data-source="kpi" data-field="registered" data-row="0">—</span> registered · <span data-source="kpi" data-field="routed_v4" data-row="0">—</span> announce IPv4, <span data-source="kpi" data-field="routed_v6" data-row="0">—</span> IPv6</div></div>
+      <div class="nr-kpi"><div class="lab">All routes valid</div><div class="val" data-source="kpi" data-field="full_share" data-row="0">—</div><div class="kd" data-kd="full_share"></div><div class="sub">share of routed ASNs</div></div>
+      <div class="nr-kpi"><div class="lab">IPv4 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v4_cov" data-row="0">—</div><div class="kd" data-kd="v4_cov"></div><div class="sub">of announced Swedish IPv4</div></div>
+      <div class="nr-kpi"><div class="lab">IPv6 space RPKI-valid</div><div class="val" data-source="kpi" data-field="v6_cov" data-row="0">—</div><div class="kd" data-kd="v6_cov"></div><div class="sub">of announced Swedish IPv6</div></div>
+      <div class="nr-kpi"><div class="lab">ASPA published</div><div class="val" data-source="kpi" data-field="aspa_all" data-row="0">—</div><div class="kd" data-kd="aspa_all"></div><div class="sub" id="aspa-sub"><span data-source="kpi" data-field="aspa_routed" data-row="0">—</span> of them routed</div></div>
+      <div class="nr-kpi"><div class="lab">High-severity findings</div><div class="val" data-source="kpi" data-field="high" data-row="0">—</div><div class="kd" data-kd="high"></div><div class="sub"><span data-source="kpi" data-field="invalid" data-row="0">—</span> invalid route(s) · <span data-source="kpi" data-field="medium" data-row="0">—</span> medium</div></div>
+    </div>
+
+    <div class="nr-card nr-full" id="trend-card">
+      <h2>Trend</h2>
+      <p class="note">Daily snapshots: share of routed ASNs whose every route is valid, and share of announced IPv4 and IPv6 space that is RPKI-valid.</p>
+      <div data-source="history" id="trend-chart" class="nr-chart" style="min-height:200px"></div>
+    </div>
+
+    <div class="nr-grid">
+      <div class="nr-card" id="status-card">
+        <h2>Route-origin validity of routed ASNs</h2>
+        <p class="note">Each announcement seen by RIPE RIS was validated against the full global ROA set. All valid: every route validates. Partly valid: some routes are NotFound or Invalid. None valid: nothing protected.</p>
+        <div data-source="status_mix" id="status-chart" style="min-height:72px"></div>
+      </div>
+      <div class="nr-card" id="ca-card">
+        <h2>Where ROAs are published</h2>
+        <p class="note">ROA prefixes naming a Swedish ASN, by the repository that publishes them. A ROA is published by the certificate authority (CA) of whoever holds the address space, which is not always the network using it (provider-assigned or leased space). With a delegated CA the holder runs the CA itself; if it or its publication server stops working, its ROAs expire and routes lose protection. One ASN can appear under several repositories. Repository counts come from the console’s per-ASN pages, which can lag the validated data by a few hours.</p>
+        <div data-source="publication" id="ca-chart" style="min-height:120px"></div>
+      </div>
+    </div>
+
+    <div class="nr-grid">
+      <div class="nr-card" id="cat-card">
+        <h2>Findings by type</h2>
+        <p class="note">One finding per ASN and issue type. Colour shows severity.</p>
+        <div data-source="cat_mix" id="cat-chart" class="nr-hbars"></div>
+      </div>
+      <div class="nr-card" id="maxlen-card">
+        <h2>How far maxLength reaches past the prefix</h2>
+        <p class="note">Every ROA prefix (VRP) for Swedish ASNs. Anything beyond “exact” permits more-specifics; unannounced ones can be hijacked with a forged origin and still validate (RFC 9319).</p>
+        <div data-source="maxlen_dist" id="maxlen-chart" class="nr-chart"></div>
+      </div>
+    </div>
+
+    <div class="nr-card nr-full" id="top-card">
+      <h2>Swedish networks by size</h2>
+      <p class="note">Every routed Swedish ASN, largest announced IPv4 space (counted in /24s) first. Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid. Click a column to sort.</p>
+      <div class="nr-filters" id="top-filters">
+        <label>Search<input class="nr-search" id="top-search" type="search" placeholder="ASN or name…"></label>
+        <label>Route validity
+          <select class="nr-select" id="top-f-status">
+            <option value="">All networks</option>
+            <option value="All valid">All routes valid</option>
+            <option value="Partly valid">Partly valid</option>
+            <option value="None valid">No valid routes</option>
+          </select></label>
+        <label>Problem
+          <select class="nr-select" id="top-f-issue">
+            <option value="">Any</option>
+            <option value="invalid">Has RPKI-invalid routes</option>
+            <option value="notfound">Has routes without ROA</option>
+            <option value="high" data-needs="high">Has high-severity findings</option>
+            <option value="wide">Has wide maxLength ROAs</option>
+            <option value="clean" data-needs="high">No high or medium findings</option>
+          </select></label>
+        <label>ASPA
+          <select class="nr-select" id="top-f-aspa">
+            <option value="">Any</option>
+            <option value="yes">Published</option>
+            <option value="no">Not published</option>
+          </select></label>
+        <label>IPv4 size
+          <select class="nr-select" id="top-f-size">
+            <option value="0">Any size</option>
+            <option value="4">/22 or larger (4+ /24s)</option>
+            <option value="16">/20 or larger (16+ /24s)</option>
+            <option value="64">/18 or larger (64+ /24s)</option>
+            <option value="256">/16 or larger (256+ /24s)</option>
+          </select></label>
+        <label class="nr-check" data-needs="chg_total"><input type="checkbox" id="top-f-changed"> Changed since last update</label>
+        <label>Sort by
+          <select class="nr-select" id="top-sort">
+            <option value="size">IPv4 space</option>
+            <option value="cov">IPv4 space valid</option>
+            <option value="valid">Routes valid</option>
+            <option value="invalid">Invalid routes</option>
+            <option value="notfound">Routes without ROA</option>
+            <option value="high" data-needs="high">High-severity findings</option>
+            <option value="wide">Wide maxLength ROAs</option>
+            <option value="changes" data-needs="chg_total">Number of changes</option>
+            <option value="name">Network name</option>
+            <option value="asn">ASN</option>
+            <option value="custom" hidden>Column</option>
+          </select></label>
+        <button class="nr-btn" id="top-dir" type="button" aria-label="Reverse sort order">↓ Descending</button>
+        <button class="nr-btn" id="top-reset" type="button">Reset</button>
+        <span class="nr-count" id="top-count" style="padding-bottom:7px"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="asns" data-row-key="asn" id="top-table">
+          <thead><tr>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="v4_24s" class="num"><button>IPv4 /24s</button></th>
+            <th data-field="roa_status"><button>ROA status</button></th>
+            <th data-field="cov_v4_pct"><button>IPv4 space valid</button></th>
+            <th data-field="valid_pct"><button>Routes valid</button></th>
+            <th data-field="invalid" class="num"><button>Invalid</button></th>
+            <th data-field="notfound" class="num"><button>No ROA</button></th>
+            <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
+            <th data-field="aspa"><button>ASPA</button></th>
+            <th data-field="high" class="num"><button>High</button></th>
+            <th data-field="chg_total"><button>Changes</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="nr-card nr-full" id="sources-card">
+      <h2>Data sources</h2>
+      <p class="note">Everything on this page is computed from these public sources once a day. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
+      <div data-source="meta" id="sources-list" class="nr-sources"></div>
+    </div>
+  </section>
+
+  <!-- CHANGES -->
+  <section class="nr-panel" data-panel="changes" id="changes" hidden>
+    <div class="nr-card nr-full" id="daily-card">
+      <h2>Changes per day, last 30 days</h2>
+      <p class="note">Number of changes found by each day's update. Click a day to list its changes below; hover for the counts.</p>
+      <div data-source="changeslog" id="daily-chart" class="nr-daily"></div>
+      <div class="nr-daily-legend"><span><i style="background:var(--cds-chart-status-critical)"></i>Worse</span><span><i style="background:var(--color-ok)"></i>Better</span><span><i style="background:var(--cds-chart-muted)"></i>Neutral</span><span id="daily-partial-note"></span></div>
+    </div>
+    <div class="nr-card nr-full">
+      <h2 id="chg-title">Change log</h2>
+      <p class="note" id="chg-note">Every change per ASN, day by day: route validity, announcements, ROAs, ASPA records and findings. Green is an improvement, red a regression, grey neutral.</p>
+      <div class="nr-filters">
+        <label>Day
+          <select class="nr-select" id="chg-day"><option value="">All 30 days</option></select></label>
+        <label>Search<input class="nr-search" id="chg-search" type="search" placeholder="ASN, name, prefix…"></label>
+        <div id="chg-chips" style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:4px">
+          <button class="nr-chip" aria-pressed="true" data-g="">All</button>
+          <button class="nr-chip" aria-pressed="false" data-g="-1">Regressions</button>
+          <button class="nr-chip" aria-pressed="false" data-g="1">Improvements</button>
+          <button class="nr-chip" aria-pressed="false" data-g="0">Neutral</button>
+        </div>
+        <span class="nr-count" id="chg-count" style="padding-bottom:7px"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="changeslog" data-row-key="id" id="chg-table">
+          <thead><tr>
+            <th data-field="date"><button>Date</button></th>
+            <th data-field="good"><button>Change</button></th>
+            <th data-field="area"><button>Area</button></th>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="text"><button>What changed</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINDINGS -->
+  <section class="nr-panel" data-panel="findings" id="findings" hidden>
+    <div class="nr-card nr-full">
+      <h2>All findings</h2>
+      <p class="note">Sorted by severity, then by the size of the network. Route validity uses exact announcements seen by RIPE RIS and the full validated ROA set.</p>
+      <div class="nr-tools">
+        <div id="sev-chips" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="nr-chip" aria-pressed="true" data-sev="">All</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="High">High</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Medium">Medium</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Low">Low</button>
+          <button class="nr-chip" aria-pressed="false" data-sev="Info">Info</button>
+        </div>
+        <input class="nr-search" id="find-search" type="search" placeholder="Search ASN, name, prefix…">
+        <span class="nr-count" id="find-count"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="findings" data-row-key="id" id="find-table">
+          <thead><tr>
+            <th data-field="severity"><button>Severity</button></th>
+            <th data-field="category"><button>Issue</button></th>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="objects"><button>Objects</button></th>
+            <th data-field="detail"><button>Why it matters</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- RECOMMENDATIONS -->
+  <section class="nr-panel" data-panel="recs" id="recs" hidden>
+    <div class="nr-card nr-full">
+      <h2>Playbook</h2>
+      <p class="note">What to do about each kind of issue. Click one to list only those recommendations below.</p>
+      <div data-source="recs" id="rec-play" class="nr-play"></div>
+    </div>
+    <div class="nr-card nr-full">
+      <h2>Recommendations</h2>
+      <p class="note">Every finding turned into a concrete action, ordered by priority and then by network size. “Fix now” routes are being dropped or are open to hijacking today; “Consider” suggests publishing ASPA for routed networks that have none.</p>
+      <div class="nr-filters">
+        <div id="rec-chips" style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:4px">
+          <button class="nr-chip" aria-pressed="true" data-p="">All</button>
+          <button class="nr-chip" aria-pressed="false" data-p="1">Fix now</button>
+          <button class="nr-chip" aria-pressed="false" data-p="2">Plan</button>
+          <button class="nr-chip" aria-pressed="false" data-p="3">Tidy up</button>
+          <button class="nr-chip" aria-pressed="false" data-p="4">Review</button>
+          <button class="nr-chip" aria-pressed="false" data-p="5">Consider</button>
+        </div>
+        <label>Issue
+          <select class="nr-select" id="rec-cat"><option value="">All issues</option></select></label>
+        <label>Search<input class="nr-search" id="rec-search" type="search" placeholder="ASN, name, prefix…"></label>
+        <span class="nr-count" id="rec-count" style="padding-bottom:7px"></span>
+      </div>
+      <div class="nr-tbox">
+        <table data-source="recs" data-row-key="id" id="rec-table">
+          <thead><tr>
+            <th data-field="priority"><button>Priority</button></th>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="category"><button>Issue</button></th>
+            <th data-field="action"><button>What to do</button></th>
+            <th data-field="who"><button>Who acts</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASPA -->
+  <section class="nr-panel" data-panel="aspa" id="aspa" hidden>
+    <div class="nr-card nr-full">
+      <h2>ASPA records for Swedish ASNs</h2>
+      <p class="note">Each row is a customer AS and the providers it authorises, next to the neighbours RIPE RIS sees on its upstream side (with how many RIS peers see each link). An unlisted neighbour is harmless if it is a peer; an unlisted transit provider makes routes fail ASPA checks. Listed providers never seen may be backup links or stale entries.</p>
+      <div class="nr-tools"><input class="nr-search" id="aspa-search" type="search" placeholder="Search ASN, name, provider…"><span class="nr-count" id="aspa-count"></span></div>
+      <div class="nr-tbox">
+        <table data-source="aspa" data-row-key="customer" id="aspa-table">
+          <thead><tr>
+            <th data-field="customer"><button>Customer AS</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="routed"><button>Routed</button></th>
+            <th data-field="providers"><button>Authorised providers</button></th>
+            <th data-field="provider_count" class="num"><button>Providers</button></th>
+            <th data-field="neighbours_seen"><button>Seen upstream-side (RIS peers)</button></th>
+            <th data-field="unlisted_neighbours"><button>Seen, not listed</button></th>
+            <th data-field="unobserved_providers"><button>Listed, not seen</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALL ASNS -->
+  <section class="nr-panel" data-panel="asns" id="asns" hidden>
+    <div class="nr-card nr-full">
+      <h2>Every Swedish-registered ASN</h2>
+      <p class="note">Click a column to sort. Use “All registered ASNs” at the top to include ASNs with no announcement seen by at least 10 RIS peers. Upstream-side neighbours are what an ASPA for that AS would likely need to list.</p>
+      <div class="nr-tools"><input class="nr-search" id="asn-search" type="search" placeholder="Search ASN or name…"><span class="nr-count" id="asn-count"></span></div>
+      <div class="nr-tbox">
+        <table data-source="asns" data-row-key="asn" id="asn-table">
+          <thead><tr>
+            <th data-field="asn"><button>ASN</button></th>
+            <th data-field="name"><button>Network</button></th>
+            <th data-field="routed"><button>Routed</button></th>
+            <th data-field="roa_status"><button>ROA status</button></th>
+            <th data-field="prefixes_v4" class="num"><button>v4 pfx</button></th>
+            <th data-field="prefixes_v6" class="num"><button>v6 pfx</button></th>
+            <th data-field="valid" class="num"><button>Valid</button></th>
+            <th data-field="notfound" class="num"><button>NotFound</button></th>
+            <th data-field="invalid" class="num"><button>Invalid</button></th>
+            <th data-field="valid_pct"><button>Routes valid</button></th>
+            <th data-field="vrps" class="num"><button>VRPs</button></th>
+            <th data-field="wide_maxlen_v4" class="num"><button>Wide maxLen</button></th>
+            <th data-field="loose_maxlen_v4" class="num"><button>Loose maxLen</button></th>
+            <th data-field="unannounced_vrps" class="num"><button>Unannounced VRPs</button></th>
+            <th data-field="aspa_providers"><button>ASPA providers</button></th>
+            <th data-field="upstreams_seen"><button>Upstream-side neighbours</button></th>
+            <th data-field="ca_model"><button>ROAs published by</button></th>
+            <th data-field="high" class="num"><button>High</button></th>
+            <th data-field="medium" class="num"><button>Med</button></th>
+            <th data-field="chg_total"><button>Changes</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- METHOD -->
+  <section class="nr-panel" data-panel="method" id="method" hidden>
+    <div class="nr-method">
+      <h3>Where the data comes from</h3>
+      <ul>
+        <li><b>Which ASNs are Swedish:</b> ASNs delegated to Sweden by RIPE NCC (RIPEstat country resource list), plus ASNs whose registry country is SE in the ipverse <i>asn-info</i> dataset.</li>
+        <li><b>What each AS announces:</b> exact prefixes from RIPEstat <i>announced-prefixes</i> (RIPE RIS), counting only routes seen by at least 10 RIS peers during the last day.</li>
+        <li><b>ROAs and ASPAs:</b> the complete validated output (<i>rpki.json</i>) of the rpki-client console, covering all five RIR trust anchors. The time of the build is in Sources.</li>
+        <li><b>Upstream-side neighbours:</b> RIPEstat <i>asn-neighbours</i> (left neighbours in RIS AS paths), with the number of RIS peers that see each link.</li>
+        <li><b>Where ROAs are published:</b> the publication point (SIA) of every ROA and ASPA object on each ASN's rpki-client console page. Hosts are grouped as RIR/NIR-hosted CAs (e.g. rpki.ripe.net), delegated CAs that publish through an RIR service (RIPE NCC Publication as a Service, ARIN Repository Publication Service), and delegated CAs with their own or a third-party publication server.</li>
+      </ul>
+      <h3>How the checks work</h3>
+      <ul>
+        <li><b>Route validity:</b> each announcement is validated per RFC 6811 against every VRP worldwide: Valid, Invalid (wrong origin AS, or longer than maxLength) or NotFound.</li>
+        <li><b>maxLength:</b> a ROA is flagged when maxLength is longer than the prefix <i>and</i> more-specifics in that range are not all announced. “Wide” is IPv4 4+ bits, “loose” 1–3 bits; IPv6 from 16 bits.</li>
+        <li><b>Unannounced ROAs:</b> ROA prefixes with no announcement from that AS inside or around them. When another Swedish AS announces the space, it is flagged as a likely migration leftover.</li>
+        <li><b>Routed or all ASNs:</b> by default every figure, table, finding, recommendation and change covers only ASNs that currently announce at least one prefix seen by 10 or more RIS peers. The switch at the top includes the unrouted ASNs too; your choice is remembered in this browser.</li>
+        <li><b>Comparing with Cloudflare Radar:</b> Radar's “ASes” figure for a country adds the ASes announcing IPv4 to those announcing IPv6, so an AS that announces both is counted twice. Count the routed ASNs here the same way (IPv4 plus IPv6) to compare.</li>
+        <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab keeps a log of every change for the last 30 days, with a chart per day.</li>
+        <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
+      </ul>
+      <h3>What this does not show</h3>
+      <ul>
+        <li>Routes seen by fewer than 10 RIS peers, or only inside Sweden.</li>
+        <li>Whether Swedish networks drop invalid routes (ROV enforcement).</li>
+        <li>AS0 ROAs and ROA expiry dates.</li>
+        <li>Swedish networks that use an ASN registered in another country.</li>
+      </ul>
+    </div>
+  </section>
+  <footer class="nr-foot">
+    Data: <a href="https://console.rpki-client.org/">rpki-client console</a> (validated ROAs and ASPAs, all RIRs) ·
+    <a href="https://stat.ripe.net/">RIPEstat</a> / RIPE RIS (announcements, neighbours) ·
+    <a href="https://github.com/ipverse/asn-info">ipverse asn-info</a>.
+    Source code: <a href="https://github.com/thorsheim/norway-rpki">github.com/thorsheim/norway-rpki</a>. Raw data: <a href="data/se_asns_rpki.json">ASNs</a>, <a href="data/se_findings.json">findings</a>, <a href="data/se_vrps.json">VRPs</a>, <a href="data/se_aspa.json">ASPA</a>, <a href="data/history.json">history</a>.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const fmt = d3.format(',');
+  const pct = (v) => (v == null || isNaN(v)) ? '—' : (Math.round(v * 10) / 10) + '%';
+  const SEV_RANK = { High: 0, Medium: 1, Low: 2, Info: 3 };
+  const sevColor = (s) => s === 'High' ? 'var(--cds-chart-status-critical)' : s === 'Medium' ? dash.colors[2] : s === 'Low' ? dash.colors[0] : 'var(--cds-chart-muted)';
+
+  // ---------- calculations ----------
+  dash.calc('kpi', {
+    inputs: ['asns', 'findings'],
+    title: 'Headline figures',
+    description: 'Counts of routed ASNs by ROA status, address-space coverage, ASPA adoption and findings by severity.',
+    fn: (asns, findings) => {
+      const routed = asns.filter(r => r.routed === 'yes');
+      const full = routed.filter(r => r.roa_status === 'All valid').length;
+      const sum = (k) => routed.reduce((t, r) => t + (r[k] || 0), 0);
+      const v4 = sum('v4_24s'), v4c = sum('v4_valid_24s'), v6 = sum('v6_48s'), v6c = sum('v6_valid_48s');
+      const routedSet = new Set(routed.map(r => r.asn));
+      return [{
+        registered: asns.length,
+        routed: routed.length,
+        routed_v4: routed.filter(r => r.prefixes_v4 > 0).length,
+        routed_v6: routed.filter(r => r.prefixes_v6 > 0).length,
+        full,
+        partial: routed.filter(r => r.roa_status === 'Partly valid').length,
+        none: routed.filter(r => r.roa_status === 'None valid').length,
+        invalid: sum('invalid'),
+        full_share: Math.round(1000 * full / routed.length) / 10,
+        v4_cov: Math.round(1000 * v4c / v4) / 10,
+        v6_cov: Math.round(1000 * v6c / v6) / 10,
+        aspa_all: asns.filter(r => r.aspa === 'yes').length,
+        aspa_routed: routed.filter(r => r.aspa === 'yes').length,
+        high: findings.filter(f => f.severity === 'High').length,
+        medium: findings.filter(f => f.severity === 'Medium').length,
+        high_routed: findings.filter(f => f.severity === 'High' && routedSet.has(f.asn)).length,
+        medium_routed: findings.filter(f => f.severity === 'Medium' && routedSet.has(f.asn)).length
+      }];
+    }
+  });
+  dash.calc('status_mix', {
+    inputs: ['asns'],
+    title: 'Routed ASNs by route validity',
+    description: 'Routed Swedish ASNs counted by whether all, some or none of their announcements validate as RPKI-valid.',
+    fn: (asns) => {
+      const routed = asns.filter(r => r.routed === 'yes');
+      return ['All valid', 'Partly valid', 'None valid'].map(s => ({ status: s, n: routed.filter(r => r.roa_status === s).length }));
+    }
+  });
+  dash.calc('ca_mix', {
+    inputs: ['asns'],
+    title: 'ASNs by CA model',
+    description: 'ASNs with current ROAs, grouped by where their ROAs are published.',
+    fn: (asns) => {
+      const m = {};
+      asns.filter(r => r.vrps > 0).forEach(r => { m[r.ca_model] = (m[r.ca_model] || 0) + 1; });
+      return Object.keys(m).map(ca_model => ({ ca_model, n: m[ca_model] })).sort((a, b) => b.n - a.n);
+    }
+  });
+  dash.calc('cat_mix', {
+    inputs: ['findings', 'asns'],
+    title: 'Findings by type',
+    description: 'Number of findings per issue type and severity, for all ASNs and for routed ASNs only.',
+    fn: (findings, asns) => {
+      const rank = { High: 0, Medium: 1, Low: 2, Info: 3 };
+      const routed = new Set(asns.filter(r => r.routed === 'yes').map(r => r.asn));
+      const m = {}, mr = {};
+      findings.forEach(f => { const k = f.category + '\u0000' + f.severity; m[k] = (m[k] || 0) + 1; if (routed.has(f.asn)) mr[k] = (mr[k] || 0) + 1; });
+      const rows = Object.keys(m).map(k => { const [category, severity] = k.split('\u0000'); return { category, severity, n: m[k], n_routed: mr[k] || 0 }; });
+      return rows.sort((a, b) => rank[a.severity] - rank[b.severity] || b.n - a.n);
+    }
+  });
+  dash.calc('maxlen_dist', {
+    inputs: ['vrps', 'asns'],
+    title: 'maxLength reach',
+    description: 'VRPs counted by how many bits maxLength extends past the prefix length, per address family.',
+    fn: (vrps, asns) => {
+      const routed = new Set(asns.filter(r => r.routed === 'yes').map(r => r.asn));
+      const buckets = ['exact', '+1–3', '+4–7', '+8–15', '+16+'];
+      const b = (s) => s === 0 ? 'exact' : s <= 3 ? '+1–3' : s <= 7 ? '+4–7' : s <= 15 ? '+8–15' : '+16+';
+      const rows = [];
+      ['IPv4', 'IPv6'].forEach(afi => buckets.forEach(k => { const m = vrps.filter(v => v.afi === afi && b(v.spread) === k); rows.push({ afi, bucket: k, n: m.length, n_routed: m.filter(v => routed.has(v.asn)).length }); }));
+      return rows;
+    }
+  });
+
+  // ---------- helpers ----------
+  const fail = (el) => { el.innerHTML = ''; const d = document.createElement('div'); d.className = 'nr-fail'; const i = document.createElement('i'); d.appendChild(i); d.appendChild(document.createTextNode('Failed to load')); el.appendChild(d); };
+  const state = (id) => dash.data(id);
+  const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); };
+  function covCell(td, v, color) {
+    const w = document.createElement('div'); w.className = 'nr-cov';
+    const bar = document.createElement('div'); bar.className = 'bar';
+    const i = document.createElement('i'); i.style.width = (v == null ? 0 : Math.max(0, Math.min(100, v))) + '%';
+    i.style.background = v == null ? 'transparent' : v >= 100 ? 'var(--color-ok)' : v > 0 ? dash.colors[2] : 'var(--cds-chart-status-critical)';
+    bar.appendChild(i); w.appendChild(bar);
+    const s = document.createElement('span'); s.textContent = v == null ? '—' : pct(v); w.appendChild(s);
+    td.appendChild(w);
+  }
+
+  // ---------- change badges and popups
+  const fmtN = (v, unit) => v == null ? '—' : d3.format(',.4~f')(Math.round(v * 10) / 10) + (unit || '');
+  const fmtSigned = (v, unit) => (v > 0 ? '+' : '−') + fmtN(Math.abs(v), unit);
+  const tipFor = new WeakMap();
+  const tipBox = document.createElement('div'); tipBox.className = 'nr-tipbox'; tipBox.setAttribute('role', 'tooltip');
+  document.body.appendChild(tipBox);
+  const MAXL = 14;
+  // All times on the page are shown in Swedish time (Europe/Stockholm).
+  const toDate = (t) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(t)) ? t : t + 'Z');
+  const osloFmt = (opts) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Stockholm', ...opts });
+  const oslo = (t, withDay = true) => t ? osloFmt(withDay ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(toDate(t)).replace(/,/g, '') : '—';
+  const osloDay = (d) => osloFmt({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(d).split('/').reverse().join('-');
+  function prevLabel() {
+    const m = state('meta');
+    const t = m.status === 'ok' && m.data.prev_generated;
+    return t ? 'the update of ' + oslo(t) : 'the previous update';
+  }
+  function fillTip(spec) {
+    clear(tipBox);
+    if (spec.title) { const h = document.createElement('div'); h.className = 'tt'; h.textContent = spec.title; tipBox.appendChild(h); }
+    const lines = spec.lines || [];
+    if (lines.length) {
+      const ul = document.createElement('ul');
+      lines.slice(0, spec.maxl || MAXL).forEach(e => {
+        const li = document.createElement('li'); const sg = document.createElement('span');
+        sg.className = 'sg ' + (e.g > 0 ? 'good' : e.g < 0 ? 'bad' : 'neutral');
+        sg.textContent = e.k === '+' ? '+' : e.k === '-' ? '−' : '~'; li.appendChild(sg);
+        const tx = document.createElement('span'); tx.textContent = e.t; li.appendChild(tx); ul.appendChild(li);
+      });
+      tipBox.appendChild(ul);
+    }
+    const more = Math.max(0, lines.length - (spec.maxl || MAXL)) + (spec.more || 0);
+    if (more || spec.note) {
+      const m = document.createElement('div'); m.className = 'more';
+      m.textContent = (more ? `…and ${more} more — ${spec.moreLabel || 'see the Changes tab'}.` : '') + (spec.note ? (more ? ' ' : '') + spec.note : ''); tipBox.appendChild(m);
+    }
+  }
+  function showTip(el) {
+    const spec = tipFor.get(el); if (!spec) return;
+    fillTip(typeof spec === 'function' ? spec() : spec);
+    tipBox.style.display = 'block';
+    const r = el.getBoundingClientRect(), w = tipBox.offsetWidth, h = tipBox.offsetHeight;
+    const x = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+    let y = r.bottom + 6; if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    tipBox.style.left = x + 'px'; tipBox.style.top = y + 'px';
+  }
+  const hideTip = () => { tipBox.style.display = 'none'; };
+  const badgeOf = (t) => t && t.closest ? t.closest('.nr-d') : null;
+  document.addEventListener('mouseover', e => { const b = badgeOf(e.target); if (b) showTip(b); else hideTip(); });
+  document.addEventListener('focusin', e => { const b = badgeOf(e.target); if (b) showTip(b); });
+  document.addEventListener('focusout', hideTip);
+  document.addEventListener('click', e => { const b = badgeOf(e.target); if (b) showTip(b); else hideTip(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+  window.addEventListener('scroll', hideTip, true);
+  function badge(parent, text, tone, spec) {
+    const b = document.createElement('span'); b.className = 'nr-d ' + tone; b.tabIndex = 0; b.textContent = text;
+    b.setAttribute('aria-label', text + ' — change details'); tipFor.set(b, spec); parent.appendChild(b); return b;
+  }
+  const toneOf = (g) => g > 0 ? 'good' : g < 0 ? 'bad' : 'neutral';
+  // numeric change of one field; goodDir: 1 if an increase is good, -1 if bad, 0 neutral
+  function deltaBadge(parent, x, field, goodDir, label, areas, unit) {
+    const d = x['d_' + field]; if (d == null || d === 0) return;
+    const prev = (x[field] ?? 0) - d;
+    const lines = (x.changes || []).filter(e => !areas || areas.includes(e.c));
+    badge(parent, fmtSigned(d, unit), toneOf(goodDir * Math.sign(d)),
+      () => ({ title: `AS${x.asn} ${label}: ${fmtN(prev)} → ${fmtN(x[field])} since ${prevLabel()}`, lines, more: lines.length ? x.changes_more : 0 }));
+  }
+  function changesBadge(parent, x, evs, more) {
+    evs = evs || x.changes || []; if (!evs.length) return;
+    const n = (k) => evs.filter(e => e.k === k).length;
+    const parts = []; if (n('+')) parts.push('+' + n('+')); if (n('-')) parts.push('−' + n('-')); if (n('~')) parts.push('~' + n('~'));
+    const good = evs.filter(e => e.g > 0).length, bad = evs.filter(e => e.g < 0).length;
+    badge(parent, parts.join(' '), bad > good ? 'bad' : good > bad ? 'good' : 'neutral',
+      () => ({ title: `AS${x.asn ?? x.customer} ${x.name}: ${evs.length + (more || 0)} change${evs.length + (more || 0) === 1 ? '' : 's'} since ${prevLabel()}`, lines: evs, more: more || 0 }));
+  }
+  function statusCell(td, x) {
+    td.textContent = x.roa_status;
+    if (x.status_prev && x.status_prev !== x.roa_status) {
+      const rank = { 'None valid': 0, 'Partly valid': 1, 'All valid': 2 };
+      const a = rank[x.status_prev], b = rank[x.roa_status];
+      const g = a == null || b == null ? 0 : Math.sign(b - a);
+      badge(td, g > 0 ? '▲' : g < 0 ? '▼' : '~', toneOf(g),
+        () => ({ title: `Was “${x.status_prev}” at ${prevLabel()}`, lines: (x.changes || []).filter(e => e.c === 'status' || e.c === 'route'), more: x.changes_more }));
+    }
+  }
+  const numD = (field, goodDir, label, areas, unit) => (td, x) => {
+    td.textContent = x[field] == null ? '' : fmtN(x[field]);
+    deltaBadge(td, x, field, goodDir, label, areas, unit);
+  };
+  const covD = (field, goodDir, label, areas) => (td, x) => {
+    covCell(td, x[field]); deltaBadge(td.querySelector('.nr-cov'), x, field, goodDir, label + ' (%)', areas, ' pp');
+  };
+  const chgCell = (td, x) => changesBadge(td, x, x.changes, x.changes_more);
+
+  // ---------- filters and sort for the networks-by-size table
+  const TOP_SORTS = { size: ['v4_24s', 'desc'], cov: ['cov_v4_pct', 'asc'], valid: ['valid_pct', 'asc'], invalid: ['invalid', 'desc'],
+    notfound: ['notfound', 'desc'], high: ['high', 'desc'], wide: ['wide_maxlen_v4', 'desc'], changes: ['chg_total', 'desc'],
+    name: ['name', 'asc'], asn: ['asn', 'asc'] };
+  const topF = { status: '', issue: '', aspa: '', size: 0, changed: false };
+  function topFilter(r) {
+    if (topF.status && r.roa_status !== topF.status) return false;
+    if (topF.aspa && r.aspa !== topF.aspa) return false;
+    if (topF.size && (r.v4_24s || 0) < topF.size) return false;
+    if (topF.changed && !(r.chg_total > 0)) return false;
+    switch (topF.issue) {
+      case 'invalid': return r.invalid > 0;
+      case 'notfound': return r.notfound > 0;
+      case 'high': return r.high > 0;
+      case 'wide': return r.wide_maxlen_v4 > 0;
+      case 'clean': return !r.high && !r.medium;
+      default: return true;
+    }
+  }
+  function setupTopFilters() {
+    const st = tables['top-table'];
+    st.filter = topFilter;
+    const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+    on('top-f-status', 'change', e => { topF.status = e.target.value; render(); });
+    on('top-f-issue', 'change', e => { topF.issue = e.target.value; render(); });
+    on('top-f-aspa', 'change', e => { topF.aspa = e.target.value; render(); });
+    on('top-f-size', 'change', e => { topF.size = Number(e.target.value); render(); });
+    on('top-f-changed', 'change', e => { topF.changed = e.target.checked; render(); });
+    on('top-sort', 'change', e => { const v = TOP_SORTS[e.target.value]; if (v) { st.key = v[0]; st.dir = v[1]; render(); } });
+    on('top-dir', 'click', () => { st.dir = st.dir === 'asc' ? 'desc' : 'asc'; render(); });
+    on('top-reset', 'click', () => {
+      Object.assign(topF, { status: '', issue: '', aspa: '', size: 0, changed: false });
+      ['top-f-status', 'top-f-issue', 'top-f-aspa'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('top-f-size').value = '0';
+      document.getElementById('top-f-changed').checked = false;
+      const q = document.getElementById('top-search'); q.value = ''; st.q = '';
+      st.key = 'v4_24s'; st.dir = 'desc'; render();
+    });
+  }
+  function syncTopControls(rows) {
+    const st = tables['top-table'];
+    const match = Object.entries(TOP_SORTS).find(([, v]) => v[0] === st.key);
+    const sel = document.getElementById('top-sort');
+    sel.querySelector('option[value="custom"]').hidden = !!match;
+    sel.value = match ? match[0] : 'custom';
+    document.getElementById('top-dir').textContent = st.dir === 'asc' ? '↑ Ascending' : '↓ Descending';
+    // hide options whose data is not in this dataset
+    document.querySelectorAll('#top-filters [data-needs]').forEach(el => {
+      const f = el.dataset.needs; const has = rows.some(r => r[f] != null);
+      if (el.tagName === 'OPTION') el.hidden = !has; else el.style.display = has ? '' : 'none';
+    });
+  }
+
+  // ---------- recommendations: one actionable row per finding, plus ASPA suggestions
+  dash.calc('recs', {
+    inputs: ['findings', 'asns'],
+    title: 'Recommendations',
+    description: 'Each finding turned into a concrete action (what to change, who changes it, how to check), plus a suggestion to publish ASPA for routed ASNs without one.',
+    fn: (findings, asns) => {
+      const byAsn = {}; asns.forEach(r => { byAsn[r.asn] = r; });
+      const splitTop = (s) => { const out = []; let d = 0, cur = ''; for (let i = 0; i < (s || '').length; i++) { const c = s[i]; if (c === '(') d++; if (c === ')') d--; if (c === ',' && d === 0 && s[i + 1] === ' ') { out.push(cur.trim()); cur = ''; i++; continue; } cur += c; } if (cur.trim()) out.push(cur.trim()); return out; };
+      const items = (s) => splitTop(s).filter(x => !/^\(\+\d+ more\)$/.test(x)).map(x => x.replace(/ \(\+\d+ more\)$/, ''));
+      const more = (s) => { const m = /\(\+(\d+) more\)$/.exec(s || ''); return m ? Number(m[1]) : 0; };
+      const list = (arr, extra) => arr.join(', ') + (extra ? ` and ${extra} more` : '');
+      const PR = { High: [1, 'Fix now'], Medium: [2, 'Plan'], Low: [3, 'Tidy up'], Info: [4, 'Review'] };
+      const L = {
+        rfc9319: ['RFC 9319: avoid maxLength', 'https://www.rfc-editor.org/rfc/rfc9319'],
+        rfc6483: ['RFC 6483: AS0 ROAs', 'https://www.rfc-editor.org/rfc/rfc6483'],
+        ripe: ['RIPE NCC: RPKI', 'https://www.ripe.net/manage-ips-and-asns/resource-management/rpki/'],
+        aspa: ['ASPA profile (IETF)', 'https://datatracker.ietf.org/doc/draft-ietf-sidrops-aspa-profile/']
+      };
+      const rows = findings.map(f => {
+        const a = f.asn, r = byAsn[a] || {}, obj = items(f.objects), n = more(f.objects);
+        let action = '', steps = [], who = 'Holder of the address space (its RPKI CA)', link = L.ripe, verify = 'The next daily update shows the change, and the finding disappears.';
+        switch (f.category) {
+          case 'RPKI-invalid announcement': {
+            const m = /^(\S+) \(ROA: (.*)\)$/.exec(obj[0] || '') || [];
+            const pfx = m[1] || obj[0] || 'the prefix', roa = m[2] || '';
+            const len = (pfx.split('/')[1] || '');
+            const roaAs = [...new Set((roa.match(/AS\d+/g) || []))].filter(x => x !== 'AS' + a);
+            if (/maxLength/.test(f.detail)) {
+              action = `Create a ROA for ${pfx} with origin AS${a} and maxLength ${len}.`;
+              steps = [`The route is RPKI-invalid because it is more specific than the existing ROA allows (${roa}). Networks doing ROV drop it today.`,
+                `Preferred: add an exact ROA for ${pfx} (origin AS${a}, maxLength ${len}) rather than raising maxLength on the covering ROA.`,
+                `Alternative: stop announcing ${pfx} and announce only the covering prefix.`];
+              link = L.rfc9319;
+            } else {
+              action = `Get a ROA for ${pfx} that names AS${a}, or stop announcing it.`;
+              steps = [`The covering ROA authorises ${roaAs.length ? roaAs.join(', ') : 'another origin'} (${roa}), not AS${a}, so ROV networks drop this route today.`,
+                `If AS${a} should announce ${pfx}: the holder of the address space${roaAs.length ? ` (likely ${roaAs[0]}'s organisation)` : ''} must create a ROA for ${pfx} with origin AS${a}, maxLength ${len}.`,
+                `If it should not: withdraw the announcement from AS${a}.`];
+              who = 'AS operator together with the address holder';
+            }
+            break;
+          }
+          case 'Routed with no ROA':
+            action = `Create ROAs for all ${f.count} announced prefix${f.count === 1 ? '' : 'es'} with origin AS${a}.`;
+            steps = [`Prefixes: ${list(obj, n)}.`,
+              'Use maxLength equal to each prefix length (one ROA entry per announced prefix).',
+              'If the space is provider-assigned, ask the provider to create the ROAs. In the RIPE NCC hosted RPKI dashboard, the announcements it sees can be turned into ROAs directly.'];
+            verify = 'The next daily update shows the routes as Valid.';
+            break;
+          case 'Some announcements not covered':
+            action = `Add ROAs for the ${f.count} uncovered prefix${f.count === 1 ? '' : 'es'} (origin AS${a}).`;
+            steps = [`Prefixes without a ROA: ${list(obj, n)}.`, 'Use maxLength equal to each prefix length.',
+              'Check whether these routes are intentional; withdraw any that are not.'];
+            verify = 'The next daily update shows all routes from this ASN as Valid.';
+            break;
+          case 'Wide maxLength (IPv4)':
+          case 'Loose maxLength (IPv4)':
+          case 'Loose maxLength (IPv6)': {
+            const ex = obj.map(o => { const m = /^(\S+)→\/(\d+)/.exec(o); return m ? `${m[1]} (now up to /${m[2]})` : o; });
+            action = `Set maxLength equal to the prefix length on ${f.count} ROA${f.count === 1 ? '' : 's'}, and add exact ROAs for the more-specifics AS${a} actually announces.`;
+            steps = [`ROAs to tighten: ${list(ex, n)}.`,
+              'With a loose maxLength, anyone can announce an unused more-specific with forged origin AS' + a + ', and it validates and wins on longest match.',
+              f.category.includes('IPv6') ? 'If you need to announce /48s on demand (e.g. DDoS mitigation), create ROAs for those /48s only when needed, or document the exception.' : 'Keep a wider maxLength only if every more-specific in the range is really announced.'];
+            link = L.rfc9319;
+            break;
+          }
+          case 'ROA for space another AS originates': {
+            const ex = obj.map(o => { const m = /^(\S+)-(\d+) \(now (.*)\)$/.exec(o); return m ? `${m[1]} → now ${m[3]}` : o; });
+            action = `Remove the ROAs that still authorise AS${a} for space other networks now announce.`;
+            steps = [`Affected: ${list(ex, n)}.`,
+              'First confirm the move was intended and that the new origin has its own ROA (otherwise it would become NotFound or Invalid).',
+              `Then delete the old ROA entries for AS${a}, so neither AS${a} nor anyone forging it stays valid there.`];
+            break;
+          }
+          case 'ROA for unannounced space':
+            action = 'Replace ROAs for unused space with AS0 ROAs, or remove them.';
+            steps = [`ROA prefixes not announced by anyone in Sweden: ${list(obj, n)}.`,
+              'If the space is unused, an AS0 ROA makes every announcement of it invalid, which blocks squatting.',
+              'If it is kept for backup or DDoS scrubbing, keep the ROA but with maxLength equal to the prefix length.'];
+            link = L.rfc6483;
+            break;
+          case 'ASPA declares no providers (AS0)':
+            if (f.severity === 'High') {
+              action = `Replace the AS0-only ASPA of AS${a} with its real upstream providers.`;
+              steps = [`AS${a} is announced through upstreams, so an AS0 ASPA makes its routes ASPA-invalid wherever ASPA is enforced.`,
+                `Upstream-side neighbours seen in RIS: ${r.upstreams_seen || 'see the All ASNs tab'}. List only those that are transit providers.`];
+            } else {
+              action = 'No action needed: an AS0 ASPA is good hygiene for an ASN that has no upstreams.';
+              steps = ['Keep it unless the ASN starts being announced through a provider.'];
+              verify = '';
+            }
+            who = 'Holder of the ASN'; link = L.aspa;
+            break;
+          case 'Observed neighbour not in ASPA':
+            action = `Check whether ${list(obj.map(o => o.split(' ')[0]), n)} ${obj.length + n === 1 ? 'is a transit provider' : 'are transit providers'} of AS${a}; add any that are to the ASPA.`;
+            steps = [`Seen upstream-side in RIS: ${list(obj, n)}.`,
+              'Peers (IXP or private peering) must not be added; only providers that carry your routes onwards to the rest of the Internet.',
+              'A missing transit provider makes routes through it fail ASPA checks once networks enforce ASPA.'];
+            who = 'Holder of the ASN'; link = L.aspa;
+            break;
+          case 'ASPA provider not observed':
+            action = `Confirm that ${list(obj, n)} still ${obj.length + n === 1 ? 'is a provider' : 'are providers'} of AS${a}.`;
+            steps = ['Keep backup or rarely used transit links in the ASPA.', 'Remove providers you no longer buy transit from, so the ASPA does not authorise paths it should not.'];
+            who = 'Holder of the ASN'; link = L.aspa; verify = '';
+            break;
+          default:
+            action = 'Review this finding.'; steps = [f.detail || ''];
+        }
+        const pr = PR[f.severity] || [4, 'Review'];
+        return { id: f.id, priority: pr[0], priority_label: pr[1], severity: f.severity, category: f.category, asn: a, name: f.name,
+          v4_24s: f.v4_24s || 0, action, steps, who, verify, objects: f.objects, link_label: link[0], link: link[1], is_new: f.is_new || 'no' };
+      });
+      asns.filter(r => r.routed === 'yes' && r.aspa !== 'yes').forEach(r => {
+        rows.push({ id: 'aspa-' + r.asn, priority: 5, priority_label: 'Consider', severity: 'Info', category: 'No ASPA published', asn: r.asn, name: r.name,
+          v4_24s: r.v4_24s || 0, action: `Publish an ASPA for AS${r.asn} listing its transit providers.`,
+          steps: [r.upstreams_seen ? `Upstream-side neighbours seen in RIS: ${r.upstreams_seen}. Include only those that are transit providers, not peers.` : 'No upstream-side neighbours were seen in RIS; list your transit providers.',
+            'ASPA lets other networks detect route leaks and forged paths that ROAs alone cannot catch.'],
+          who: 'Holder of the ASN', verify: 'The ASN shows ASPA: yes in the next daily update.', objects: '', link_label: L.aspa[0], link: L.aspa[1], is_new: 'no' });
+      });
+      return rows.sort((x, y) => x.priority - y.priority || y.v4_24s - x.v4_24s || x.asn - y.asn || String(x.id).localeCompare(String(y.id)));
+    }
+  });
+
+  // ---------- scope: routed ASNs only (default) or all registered ASNs
+  let scope = 'routed';
+  try { const v = localStorage.getItem('nr-scope'); if (v === 'all' || v === 'routed') scope = v; } catch (e) {}
+  if (/[#&]all-asns\b/.test(location.hash)) scope = 'all';
+  const inScope = (asn) => scope === 'all' || ((asnMap().get(asn) || {}).routed === 'yes');
+  document.querySelectorAll('#scope-bar [data-scope]').forEach(b => b.addEventListener('click', () => {
+    scope = b.dataset.scope; try { localStorage.setItem('nr-scope', scope); } catch (e) {} render();
+  }));
+  function renderScope() {
+    const a = state('asns'); const rows = a.status === 'ok' ? a.data : [];
+    const nr = rows.filter(r => r.routed === 'yes').length;
+    document.querySelectorAll('#scope-bar [data-scope]').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.scope === scope ? 'true' : 'false');
+      if (rows.length) b.textContent = b.dataset.scope === 'routed' ? `Routed ASNs (${nr})` : `All registered ASNs (${rows.length})`;
+    });
+    document.getElementById('scope-note').textContent = rows.length ? (scope === 'routed'
+      ? `${rows.length - nr} registered ASNs announce nothing seen by at least 10 RIS peers and are left out of findings, recommendations, changes and tables.`
+      : 'Unrouted ASNs are included; they can still have ROAs, ASPAs and findings.') : '';
+  }
+
+  // Generic sortable/searchable table
+  const tables = {};
+  function setupTable(id, opts) {
+    const t = document.getElementById(id);
+    const st = { key: opts.sortKey, dir: opts.sortDir || 'desc', q: '', filter: null };
+    tables[id] = st;
+    t.querySelectorAll('th').forEach(th => {
+      th.querySelector('button').addEventListener('click', () => {
+        const f = th.dataset.field;
+        if (st.key === f) st.dir = st.dir === 'asc' ? 'desc' : 'asc'; else { st.key = f; st.dir = opts.numeric && opts.numeric.includes(f) ? 'desc' : 'asc'; }
+        render();
+      });
+    });
+    if (opts.search) document.getElementById(opts.search).addEventListener('input', (e) => { st.q = e.target.value.trim().toLowerCase(); render(); });
+    return st;
+  }
+  function drawTable(id, rows, cols, opts) {
+    const t = document.getElementById(id); const st = tables[id]; const tb = t.querySelector('tbody'); clear(tb);
+    t.querySelectorAll('th').forEach(th => { if (th.dataset.field === st.key) th.setAttribute('aria-sort', st.dir === 'asc' ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort'); });
+    let r = rows.slice();
+    if (st.filter) r = r.filter(st.filter);
+    if (st.q) r = r.filter(x => cols.some(c => String(x[c.f] ?? '').toLowerCase().includes(st.q)) || ('as' + x[opts.key]).includes(st.q));
+    const sorter = opts.sorter ? opts.sorter(st) : null;
+    r.sort(sorter || ((a, b) => {
+      const va = a[st.key], vb = b[st.key];
+      const c = (typeof va === 'number' || typeof vb === 'number') ? ((va ?? -1) - (vb ?? -1)) : String(va ?? '').localeCompare(String(vb ?? ''));
+      return st.dir === 'asc' ? c : -c;
+    }));
+    if (opts.limit) r = r.slice(0, opts.limit);
+    r.forEach(x => {
+      const tr = document.createElement('tr'); tr.dataset.key = String(x[opts.key]);
+      cols.forEach(c => {
+        const td = document.createElement('td'); if (c.cls) td.className = c.cls;
+        if (c.render) c.render(td, x); else td.textContent = x[c.f] == null ? '' : String(x[c.f]);
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    if (opts.count) document.getElementById(opts.count).textContent = r.length === rows.length ? `${fmt(rows.length)} rows` : `${fmt(r.length)} of ${fmt(rows.length)} rows`;
+  }
+  const asCell = (f) => (td, x) => { td.textContent = 'AS' + x[f]; };
+  const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
+  const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
+
+  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'invalid', 'notfound', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTopFilters();
+  setupTable('chg-table', { sortKey: 'date', sortDir: 'desc', search: 'chg-search', numeric: ['asn'] });
+  document.getElementById('chg-day').addEventListener('change', e => { chgDay = e.target.value; render(); });
+  setupTable('find-table', { sortKey: 'severity', sortDir: 'asc', search: 'find-search' });
+  setupTable('rec-table', { sortKey: 'priority', sortDir: 'asc', search: 'rec-search', numeric: ['asn', 'priority'] });
+  document.querySelectorAll('#rec-chips .nr-chip').forEach(b => b.addEventListener('click', () => { recPrio = b.dataset.p; render(); }));
+  document.getElementById('rec-cat').addEventListener('change', e => { recCat = e.target.value; render(); });
+  setupTable('aspa-table', { sortKey: 'customer', sortDir: 'asc', search: 'aspa-search', numeric: ['provider_count', 'customer'] });
+  setupTable('asn-table', { sortKey: 'asn', sortDir: 'asc', search: 'asn-search', numeric: ['asn', 'prefixes_v4', 'prefixes_v6', 'valid', 'notfound', 'invalid', 'valid_pct', 'vrps', 'wide_maxlen_v4', 'loose_maxlen_v4', 'unannounced_vrps', 'high', 'medium', 'chg_total'] });
+
+  document.querySelectorAll('#chg-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#chg-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    chgGood = b.dataset.g; render();
+  }));
+  document.querySelectorAll('#sev-chips .nr-chip').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#sev-chips .nr-chip').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    const s = b.dataset.sev; tables['find-table'].filter = s ? (x => x.severity === s) : null; render();
+  }));
+
+  // Tabs
+  function showTab(name, push) {
+    document.querySelectorAll('.nr-tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+    document.querySelectorAll('.nr-panel').forEach(p => { p.hidden = p.dataset.panel !== name; });
+    if (push) dash.setLink(name);
+    render();
+  }
+  document.querySelectorAll('.nr-tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab, true)));
+
+  // ---------- renderers ----------
+  function renderKpi() {
+    const k = state('kpi');
+    document.querySelectorAll('[data-source="kpi"]').forEach(el => {
+      if (k.status === 'ok' && k.data && k.data[0]) {
+        const remap = scope === 'routed' ? { aspa_all: 'aspa_routed', high: 'high_routed', medium: 'medium_routed' } : {};
+        const f = el.dataset.field;
+        const v = k.data[0][remap[f] || f];
+        el.textContent = (f === 'full_share' || f === 'v4_cov' || f === 'v6_cov') ? pct(v) : fmt(v);
+        el.classList.remove('dash-skeleton');
+      } else if (k.status === 'error') { el.textContent = '—'; el.classList.remove('dash-skeleton'); }
+      else el.textContent = '—';
+    });
+  }
+
+  function renderAspaSub() {
+    const k = state('kpi'), el = document.getElementById('aspa-sub');
+    if (k.status !== 'ok' || !k.data[0]) return;
+    el.textContent = scope === 'routed' ? `routed ASNs · ${fmt(k.data[0].aspa_all)} including unrouted` : `${fmt(k.data[0].aspa_routed)} of them routed`;
+  }
+
+  function renderKpiDeltas() {
+    const m = state('meta'), a = state('asns');
+    document.querySelectorAll('[data-kd]').forEach(clear);
+    const sum = document.getElementById('chg-sum'); clear(sum);
+    if (m.status !== 'ok' || !m.data.prev_headline || !m.data.headline) return;
+    const h = m.data.headline, p = m.data.prev_headline, rows = a.status === 'ok' ? a.data : [];
+    const lab = (r) => `AS${r.asn} ${r.name}`;
+    const ev = (filter) => rows.filter(r => inScope(r.asn)).flatMap(r => (r.changes || []).filter(filter).map(e => ({ ...e, t: `${lab(r)}: ${e.t}` })));
+    const R = scope === 'routed';
+    const share = (o) => o.routed ? 100 * o.all_valid / o.routed : 0;
+    const v6re = /[0-9a-f]{1,4}:[0-9a-f:]*\/\d+/i;
+    const spec = {
+      routed: { cur: h.routed, prev: p.routed, dir: 0, pct: false,
+        lines: () => rows.filter(r => r.status_prev && ((r.status_prev === 'Not routed') !== (r.roa_status === 'Not routed')))
+          .map(r => ({ k: r.roa_status === 'Not routed' ? '-' : '+', g: 0, t: `${lab(r)}: ${r.roa_status === 'Not routed' ? 'no longer routed' : 'now routed'}` })) },
+      full_share: { cur: share(h), prev: share(p), dir: 1, pct: true, lines: () => ev(e => e.c === 'status') },
+      v4_cov: { cur: h.v4_valid_pct, prev: p.v4_valid_pct, dir: 1, pct: true,
+        lines: () => rows.filter(r => r.d_cov_v4_pct).sort((x, y) => Math.abs(y.d_cov_v4_pct) - Math.abs(x.d_cov_v4_pct))
+          .map(r => ({ k: '~', g: Math.sign(r.d_cov_v4_pct), t: `${lab(r)}: IPv4 space valid ${fmtN(r.cov_v4_pct - r.d_cov_v4_pct)}% → ${fmtN(r.cov_v4_pct)}%` })) },
+      v6_cov: { cur: h.v6_valid_pct, prev: p.v6_valid_pct, dir: 1, pct: true, lines: () => ev(e => e.c === 'route' && v6re.test(e.t)) },
+      aspa_all: { cur: R ? h.aspa_routed : h.aspa, prev: R ? p.aspa_routed : p.aspa, dir: 1, pct: false, lines: () => ev(e => e.c === 'aspa') },
+      high: { cur: R ? h.high_routed : h.high, prev: R ? p.high_routed : p.high, dir: -1, pct: false, lines: () => ev(e => e.c === 'finding' && /high finding|\(High\)/.test(e.t)) }
+    };
+    Object.entries(spec).forEach(([k, o]) => {
+      const el = document.querySelector(`[data-kd="${k}"]`); if (!el || o.cur == null || o.prev == null) return;
+      const d = Math.round((o.cur - o.prev) * 10) / 10;
+      if (!d) return;
+      const pf = (v) => fmtN(v) + (o.pct ? '%' : '');
+      badge(el, fmtSigned(d, o.pct ? ' pp' : ''), toneOf(o.dir * Math.sign(d)),
+        () => ({ title: `${pf(o.prev)} → ${pf(o.cur)} since ${prevLabel()}`, lines: o.lines() }));
+    });
+    const c = state('changes');
+    if (c.status === 'ok') {
+      const all = c.data.filter(e => inScope(e.asn)), fmtE = (e) => ({ k: e.kind, g: e.good, t: `AS${e.asn} ${e.name}: ${e.text}` });
+      const good = all.filter(e => e.good > 0), bad = all.filter(e => e.good < 0), neu = all.filter(e => e.good === 0);
+      const asns = new Set(all.map(e => e.asn)).size;
+      sum.appendChild(document.createTextNode(all.length
+        ? `Since ${prevLabel()}: ${d3.format(',')(all.length)} change${all.length === 1 ? '' : 's'} across ${asns} ASN${asns === 1 ? '' : 's'}`
+        : `No changes since ${prevLabel()}.`));
+      if (bad.length) badge(sum, `${bad.length} worse`, 'bad', () => ({ title: 'Regressions', lines: bad.map(fmtE) }));
+      if (good.length) badge(sum, `${good.length} better`, 'good', () => ({ title: 'Improvements', lines: good.map(fmtE) }));
+      if (neu.length) badge(sum, `${neu.length} neutral`, 'neutral', () => ({ title: 'Neutral changes', lines: neu.map(fmtE) }));
+      { const b = document.createElement('button'); b.textContent = all.length ? 'See all changes · 30-day log' : '30-day change log'; b.addEventListener('click', () => showTab('changes', true)); sum.appendChild(b); }
+    }
+  }
+
+  let chgDay = '', chgGood = '';
+  const dayFmt = (d) => d3.utcFormat('%a %-d %b')(new Date(d + 'T00:00:00Z'));
+  function logRows() {
+    const s = state('changeslog'); if (s.status !== 'ok') return null;
+    const out = []; let i = 0;
+    (s.data.runs || []).forEach(run => run.events.forEach(e => { if (inScope(e.asn)) out.push({ ...e, id: run.generated + '|' + e.id, date: run.date, generated: run.generated, detail: run.detail, _i: i++ }); }));
+    return out;
+  }
+  function logDays() {
+    const s = state('changeslog'); if (s.status !== 'ok' || !s.data.runs || !s.data.runs.length) return [];
+    const runs = s.data.runs, n = s.data.days || 30;
+    const last = new Date(runs[runs.length - 1].date + 'T00:00:00Z');
+    const days = [];
+    for (let k = n - 1; k >= 0; k--) {
+      const d = d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(last, -k));
+      const rs = runs.filter(r => r.date === d);
+      const ev = rs.flatMap(r => r.events).filter(e => inScope(e.asn));
+      days.push({ date: d, runs: rs.length, partial: rs.some(r => r.detail === 'partial'),
+        bad: ev.filter(e => e.good < 0).length, good: ev.filter(e => e.good > 0).length, neutral: ev.filter(e => e.good === 0).length,
+        asns: new Set(ev.map(e => e.asn)).size });
+    }
+    return days;
+  }
+  function renderDaily() {
+    const el = document.getElementById('daily-chart'); const s = state('changeslog');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const W = el.clientWidth; if (!W) return;
+    const days = logDays(); if (!days.length) { const p = document.createElement('div'); p.className = 'nr-fail'; p.textContent = 'The change log fills in with each daily update.'; el.appendChild(p); return; }
+    const H = 230, m = { t: 12, r: 8, b: 26, l: 8 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const y = d3.scaleLinear([0, d3.max(days, d => d.bad + d.good + d.neutral) || 1], [H - m.b, m.t]).nice();
+    const ticks = y.ticks(4);
+    const tmp = svg.append('text').attr('font-size', 'var(--cds-font-size-caption)').text(fmt(ticks[ticks.length - 1]));
+    m.l = tmp.node().getComputedTextLength() + 12; tmp.remove();
+    const x = d3.scaleBand(days.map(d => d.date), [m.l, W - m.r]).paddingInner(0.22).paddingOuter(0.05);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmt(d));
+    const every = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor(W / 70))));
+    svg.append('g').selectAll('text').data(days.filter((d, i) => (days.length - 1 - i) % every === 0)).join('text')
+      .attr('x', d => x(d.date) + x.bandwidth() / 2).attr('y', H - 7).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)')
+      .attr('font-size', 'var(--cds-font-size-caption)').text(d => d3.utcFormat('%-d %b')(new Date(d.date + 'T00:00:00Z')));
+    const colors = { bad: 'var(--cds-chart-status-critical)', good: 'var(--color-ok)', neutral: 'var(--cds-chart-muted)' };
+    const tip = d3.select(el).append('div').attr('class', 'nr-tip');
+    const g = svg.append('g');
+    days.forEach(d => {
+      const col = g.append('g').attr('class', 'bar').attr('opacity', chgDay && chgDay !== d.date ? 0.35 : 1);
+      let y0 = y(0);
+      ['bad', 'good', 'neutral'].forEach(k => {
+        if (!d[k]) return;
+        const h = y(0) - y(d[k]);
+        col.append('rect').attr('x', x(d.date)).attr('width', x.bandwidth()).attr('y', y0 - h).attr('height', Math.max(1, h - 1)).attr('rx', Math.min(3, x.bandwidth() / 3)).attr('fill', colors[k]);
+        y0 -= h;
+      });
+      if (!d.runs) col.append('rect').attr('x', x(d.date)).attr('width', x.bandwidth()).attr('y', y(0) - 2).attr('height', 2).attr('fill', 'var(--cds-chart-grid)');
+      col.append('rect').attr('x', x(d.date) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('y', m.t).attr('height', y(0) - m.t).attr('fill', 'transparent')
+        .on('mousemove', (ev) => {
+          const [px, py] = d3.pointer(ev, el); tip.html('');
+          tip.append('div').attr('class', 'k').text(dayFmt(d.date) + (d.partial ? ' · less detailed' : ''));
+          if (!d.runs) tip.append('div').text('No update this day');
+          else if (!(d.bad + d.good + d.neutral)) tip.append('div').text('No changes');
+          else {
+            tip.append('div').text(`${fmt(d.bad + d.good + d.neutral)} changes across ${d.asns} ASN${d.asns === 1 ? '' : 's'}`);
+            [['bad', 'worse'], ['good', 'better'], ['neutral', 'neutral']].forEach(([k, l]) => { if (d[k]) tip.append('div').text(`${fmt(d[k])} ${l}`).style('color', colors[k]); });
+            tip.append('div').attr('class', 'k').text('Click to list them');
+          }
+          const tw = tip.node().offsetWidth; tip.style('left', Math.min(Math.max(0, px + 12), W - tw) + 'px').style('top', Math.max(0, py - 60) + 'px').style('opacity', 1);
+        })
+        .on('mouseleave', () => tip.style('opacity', 0))
+        .on('click', () => { if (!d.runs) return; chgDay = chgDay === d.date ? '' : d.date; document.getElementById('chg-day').value = chgDay; render(); });
+    });
+    if (chgDay) {
+      const xs = x(chgDay); if (xs != null) svg.append('rect').attr('x', xs - 2).attr('width', x.bandwidth() + 4).attr('y', m.t - 4).attr('height', y(0) - m.t + 6).attr('rx', 4).attr('fill', 'none').attr('stroke', 'var(--color-fg)').attr('stroke-width', 1.5).attr('pointer-events', 'none');
+    }
+    const pn = document.getElementById('daily-partial-note');
+    pn.textContent = days.some(d => d.partial) ? 'Days marked “less detailed” in the hover compare findings per type only (before prefix-level tracking started).' : '';
+  }
+
+  function renderChanges() {
+    renderDaily();
+    const rows = logRows(); if (!rows) return;
+    // day selector
+    const sel = document.getElementById('chg-day');
+    const days = logDays().filter(d => d.runs).reverse();
+    const want = [''].concat(days.map(d => d.date)).join(',');
+    if (sel.dataset.opts !== want) {
+      clear(sel);
+      const o0 = document.createElement('option'); o0.value = ''; o0.textContent = `All ${days.length} days with updates`; sel.appendChild(o0);
+      days.forEach(d => { const o = document.createElement('option'); o.value = d.date; o.textContent = `${dayFmt(d.date)} (${d.bad + d.good + d.neutral})`; sel.appendChild(o); });
+      sel.dataset.opts = want;
+    }
+    sel.value = chgDay;
+    const st = tables['chg-table'];
+    st.filter = (x) => (!chgDay || x.date === chgDay) && (chgGood === '' || x.good === Number(chgGood));
+    document.getElementById('chg-title').textContent = chgDay ? `Changes on ${dayFmt(chgDay)}` : 'Change log, last 30 days';
+    drawTable('chg-table', rows, [
+      { f: 'date', render: (td, x) => { td.textContent = dayFmt(x.date); td.style.whiteSpace = 'nowrap'; } },
+      { f: 'good', render: (td, x) => { const b = document.createElement('span'); b.className = 'nr-d ' + toneOf(x.good); b.style.marginLeft = '0'; b.style.cursor = 'default'; b.textContent = x.kind === '+' ? '+' : x.kind === '-' ? '−' : '~'; td.appendChild(b); } },
+      { f: 'area' }, { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'text', cls: 'wrap mono' }
+    ], { key: 'id', count: 'chg-count', sorter: (st) => {
+      if (st.key === 'date') return (a, b) => (st.dir === 'asc' ? 1 : -1) * a.date.localeCompare(b.date) || (st.dir === 'asc' ? a._i - b._i : (b.generated.localeCompare(a.generated) || a._i - b._i));
+      if (st.key === 'good') return (a, b) => (st.dir === 'asc' ? 1 : -1) * (a.good - b.good) || b.date.localeCompare(a.date) || a._i - b._i;
+      return null;
+    } });
+  }
+
+  // ---------- recommendations tab
+  let recPrio = '', recCat = '';
+  const PLAY = {
+    'RPKI-invalid announcement': 'Get a ROA that matches the route (right origin AS, long enough maxLength), or stop announcing it. These routes are dropped by ROV networks today.',
+    'Wide maxLength (IPv4)': 'Set maxLength equal to the prefix length and add exact ROAs for announced more-specifics (RFC 9319).',
+    'Routed with no ROA': 'Create ROAs for every announced prefix, maxLength equal to the prefix length.',
+    'Some announcements not covered': 'Add ROAs for the announcements that have none.',
+    'Loose maxLength (IPv4)': 'Tighten maxLength to what is actually announced.',
+    'ROA for space another AS originates': 'Remove leftover ROAs after migrations, once the new origin has its own ROA.',
+    'Loose maxLength (IPv6)': 'Prefer exact ROAs over /32→/48; document any deliberate exception.',
+    'ROA for unannounced space': 'Use AS0 ROAs for unused space, or keep backup ROAs exact.',
+    'ASPA declares no providers (AS0)': 'AS0 ASPA is right only for ASNs without upstreams; otherwise list the providers.',
+    'Observed neighbour not in ASPA': 'Add any transit provider missing from the ASPA; peers stay out.',
+    'ASPA provider not observed': 'Remove providers you no longer use; keep backup links.',
+    'No ASPA published': 'Publish an ASPA listing your transit providers.'
+  };
+  function renderRecs() {
+    const s = state('recs'); const play = document.getElementById('rec-play');
+    if (s.status === 'error') { fail(play); return; }
+    if (s.status !== 'ok') return;
+    const rows = s.data.filter(r => inScope(r.asn));
+    // playbook
+    clear(play);
+    const cats = [];
+    rows.forEach(r => { let c = cats.find(x => x.category === r.category); if (!c) { c = { category: r.category, n: 0, p: r.priority, asns: new Set() }; cats.push(c); } c.n++; c.asns.add(r.asn); c.p = Math.min(c.p, r.priority); });
+    cats.sort((a, b) => a.p - b.p || b.n - a.n);
+    cats.forEach(c => {
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', recCat === c.category ? 'true' : 'false');
+      const hd = document.createElement('div'); hd.className = 'hd';
+      const t = document.createElement('span'); t.textContent = c.category; t.style.whiteSpace = 'normal'; hd.appendChild(t);
+      const n = document.createElement('span'); n.textContent = (c.n === c.asns.size ? '' : `${fmt(c.n)} routes · `) + `${c.asns.size} ASN${c.asns.size === 1 ? '' : 's'}`; hd.appendChild(n);
+      b.appendChild(hd);
+      const ds = document.createElement('div'); ds.className = 'ds'; ds.textContent = PLAY[c.category] || ''; b.appendChild(ds);
+      b.addEventListener('click', () => { recCat = recCat === c.category ? '' : c.category; render(); });
+      play.appendChild(b);
+    });
+    // category select
+    const sel = document.getElementById('rec-cat'); const want = cats.map(c => c.category).join('|');
+    if (sel.dataset.opts !== want) {
+      clear(sel); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'All issues'; sel.appendChild(o0);
+      cats.forEach(c => { const o = document.createElement('option'); o.value = c.category; o.textContent = `${c.category} (${c.n})`; sel.appendChild(o); });
+      sel.dataset.opts = want;
+    }
+    sel.value = recCat;
+    // chip counts
+    document.querySelectorAll('#rec-chips .nr-chip').forEach(b => {
+      const p = b.dataset.p; const n = p ? rows.filter(r => String(r.priority) === p).length : rows.length;
+      b.textContent = (b.dataset.label || (b.dataset.label = b.textContent)) + ` (${fmt(n)})`;
+      b.setAttribute('aria-pressed', p === recPrio ? 'true' : 'false');
+    });
+    tables['rec-table'].filter = (x) => (!recPrio || String(x.priority) === recPrio) && (!recCat || x.category === recCat);
+    drawTable('rec-table', rows, [
+      { f: 'priority', render: (td, x) => { const p = document.createElement('span'); p.className = 'nr-prio p' + x.priority; p.textContent = x.priority_label; td.appendChild(p); if (x.is_new === 'yes') { const nw = document.createElement('div'); nw.className = 'nr-sev High'; nw.style.marginTop = '4px'; nw.textContent = 'New'; td.appendChild(nw); } } },
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'category' },
+      { f: 'action', cls: 'wrap', render: (td, x) => {
+        td.style.minWidth = '22rem';
+        const a = document.createElement('div'); a.className = 'nr-rec-act'; a.textContent = x.action; td.appendChild(a);
+        if (x.steps && x.steps.length) { const ul = document.createElement('ul'); ul.className = 'nr-rec-steps'; x.steps.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); }); td.appendChild(ul); }
+        const m = document.createElement('div'); m.className = 'nr-rec-meta';
+        if (x.verify) m.appendChild(document.createTextNode('Check: ' + x.verify + ' '));
+        if (x.link) { const l = document.createElement('a'); l.href = x.link; l.textContent = x.link_label; l.target = '_blank'; l.rel = 'noopener'; m.appendChild(l); }
+        td.appendChild(m);
+      } },
+      { f: 'who', cls: 'wrap' }
+    ], { key: 'id', count: 'rec-count', sorter: (st) => st.key === 'priority' ? ((a, b) => (st.dir === 'asc' ? 1 : -1) * (a.priority - b.priority) || b.v4_24s - a.v4_24s || a.asn - b.asn) : null });
+  }
+
+  function renderStatus() {
+    const el = document.getElementById('status-chart'); const s = state('status_mix');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const rows = s.data; const tot = d3.sum(rows, r => r.n);
+    const colors = { 'All valid': 'var(--color-ok)', 'Partly valid': dash.colors[2], 'None valid': 'var(--cds-chart-status-critical)' };
+    const bar = document.createElement('div'); bar.className = 'nr-stack';
+    rows.forEach(r => { const d = document.createElement('div'); d.style.flex = String(r.n); d.style.background = colors[r.status]; d.title = ''; bar.appendChild(d); });
+    el.appendChild(bar);
+    const lg = document.createElement('div'); lg.className = 'nr-legend';
+    rows.forEach(r => {
+      const it = document.createElement('div');
+      const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = colors[r.status]; it.appendChild(sw);
+      it.appendChild(document.createTextNode(r.status + ' '));
+      const b = document.createElement('b'); b.textContent = fmt(r.n); it.appendChild(b);
+      const sp = document.createElement('span'); sp.style.color = 'var(--color-fg-muted)'; sp.textContent = ' · ' + d3.format('.0%')(r.n / tot); it.appendChild(sp);
+      lg.appendChild(it);
+    });
+    el.appendChild(lg);
+  }
+
+  function renderPub() {
+    const el = document.getElementById('ca-chart'); const s = state('publication');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const order = ['Hosted CA at an RIR/NIR', 'Delegated CA, published by an RIR', 'Delegated CA, own or third-party publication'];
+    const col = { 'Hosted CA at an RIR/NIR': dash.colors[0], 'Delegated CA, published by an RIR': dash.colors[3], 'Delegated CA, own or third-party publication': dash.colors[2] };
+    const data = s.data.map(r => {
+      if (!r.by_asn) return r;
+      const b = r.by_asn.filter(x => inScope(x[0]));
+      return { ...r, vrps: d3.sum(b, x => x[1]), roas: d3.sum(b, x => x[2]), aspas: d3.sum(b, x => x[3]), asns: b.length,
+        asn_list: (r.asn_list || []).filter(t => inScope(Number(String(t).split(' ')[0].slice(2)))) };
+    }).filter(r => r.asns > 0);
+    const max = d3.max(data, r => r.vrps) || 1;
+    const asnRows = (state('asns').status === 'ok' ? state('asns').data : []).filter(r => inScope(r.asn));
+    order.forEach(model => {
+      const rows = data.filter(r => r.model === model); if (!rows.length) return;
+      const g = document.createElement('div'); g.className = 'nr-pub-group';
+      const h = document.createElement('h3'); h.appendChild(document.createTextNode(model));
+      const nAsn = asnRows.filter(r => (r.ca_model || '').split('; ').includes(model)).length;
+      const sp = document.createElement('span'); sp.textContent = `${fmt(d3.sum(rows, r => r.vrps))} ROA prefixes · ${nAsn} ASNs`; h.appendChild(sp); g.appendChild(h);
+      rows.forEach(r => {
+        const row = document.createElement('div'); row.className = 'nr-pub-row';
+        const t = document.createElement('div'); t.className = 't';
+        const a = document.createElement('span'); a.className = 'h';
+        const c = document.createElement('code'); c.textContent = r.host; a.appendChild(c);
+        const sm = document.createElement('small'); sm.textContent = r.operator; a.appendChild(sm);
+        const n = document.createElement('span'); n.className = 'n';
+        n.textContent = `${fmt(r.vrps)} prefixes${r.aspas ? ` · ${fmt(r.aspas)} ASPA` : ''} · `;
+        badge(n, `${r.asns} ASN${r.asns === 1 ? '' : 's'}`, 'neutral', () => ({ title: `${r.host} — ${r.operator}`, lines: (r.asn_list || []).map(x => ({ k: '+', g: 0, t: x })), maxl: 24, moreLabel: 'see “ROAs published by” in the All ASNs tab', note: `${fmt(r.roas)} ROA objects with ${fmt(r.vrps)} prefixes${r.aspas ? `, ${r.aspas} ASPA objects` : ''}.` }));
+        t.appendChild(a); t.appendChild(n); row.appendChild(t);
+        const tr = document.createElement('div'); tr.className = 'track';
+        const f = document.createElement('div'); f.className = 'fill'; f.style.width = (100 * r.vrps / max) + '%'; f.style.background = col[model]; tr.appendChild(f);
+        row.appendChild(tr); g.appendChild(row);
+      });
+      el.appendChild(g);
+    });
+  }
+
+  function renderSources() {
+    const el = document.getElementById('sources-list'); const m = state('meta');
+    if (m.status === 'error') return fail(el);
+    clear(el); if (m.status !== 'ok') return;
+    const f = (t) => t ? oslo(t) + ' Swedish time' : null;
+    const extra = { rpki_buildtime: m.data.global_vrps ? `${fmt(m.data.global_vrps)} VRPs and ${fmt(m.data.global_aspas)} ASPAs worldwide in this build.` : '' };
+    const src = m.data.sources || [];
+    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt daily by a GitHub Action.', time: 'generated' }]).forEach(x => {
+      const d = document.createElement('div'); d.className = 'nr-src';
+      const a = document.createElement('a'); a.href = x.url; a.textContent = x.name; a.rel = 'noopener'; d.appendChild(a);
+      const w = document.createElement('div'); w.className = 'w'; w.textContent = x.what + (extra[x.time] ? ' ' + extra[x.time] : ''); d.appendChild(w);
+      const t = x.time && f(m.data[x.time]);
+      if (t) { const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = (x.time === 'rpki_buildtime' ? 'Validated data built ' : x.time === 'generated' ? 'This update ran ' : 'Data up to ') + t; d.appendChild(tm); }
+      el.appendChild(d);
+    });
+  }
+
+  function hbars(elId, srcId, label, color, key) {
+    const el = document.getElementById(elId); const s = state(srcId);
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const data = s.data.map(r => ({ ...r, n: key && r[key] != null ? r[key] : r.n })).filter(r => r.n > 0);
+    const max = d3.max(data, r => r.n) || 1;
+    data.forEach(r => {
+      const row = document.createElement('div'); row.className = 'nr-hrow';
+      const t = document.createElement('div'); t.className = 't';
+      const a = document.createElement('span'); a.textContent = label(r); t.appendChild(a);
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = fmt(r.n); t.appendChild(n);
+      row.appendChild(t);
+      const tr = document.createElement('div'); tr.className = 'track';
+      const f = document.createElement('div'); f.className = 'fill'; f.style.width = (100 * r.n / max) + '%'; f.style.background = color(r); tr.appendChild(f);
+      row.appendChild(tr); el.appendChild(row);
+    });
+  }
+
+  function renderMaxlen() {
+    const el = document.getElementById('maxlen-chart'); const s = state('maxlen_dist');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const data = s.data.map(d => ({ ...d, n: scope === 'routed' && d.n_routed != null ? d.n_routed : d.n }));
+    const W = el.clientWidth; if (!W) return;
+    const H = 240; const m = { t: 28, r: 8, b: 26, l: 8 };
+    const buckets = Array.from(new Set(data.map(d => d.bucket)));
+    const afis = ['IPv4', 'IPv6'];
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const y = d3.scaleLinear([0, d3.max(data, d => d.n) || 1], [H - m.b, m.t]).nice();
+    // left margin from widest tick
+    const tmp = svg.append('g').attr('font-size', 'var(--cds-font-size-caption)');
+    const ticks = y.ticks(4); let lw = 0;
+    ticks.forEach(t => { const tx = tmp.append('text').text(fmt(t)); lw = Math.max(lw, tx.node().getComputedTextLength()); });
+    tmp.remove(); m.l = lw + 12;
+    const x0 = d3.scaleBand(buckets, [m.l, W - m.r]).paddingInner(0.25).paddingOuter(0.1);
+    const x1 = d3.scaleBand(afis, [0, x0.bandwidth()]).padding(0.12);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmt(d));
+    const tip = d3.select(el).append('div').attr('class', 'nr-tip');
+    const g = svg.append('g');
+    g.selectAll('rect').data(data).join('rect')
+      .attr('x', d => x0(d.bucket) + x1(d.afi)).attr('width', Math.min(32, x1.bandwidth()))
+      .attr('y', d => y(d.n)).attr('height', d => Math.max(0, y(0) - y(d.n))).attr('rx', 4)
+      .attr('fill', d => d.afi === 'IPv4' ? dash.colors[0] : dash.colors[1])
+      .on('mousemove', function (ev, d) {
+        const [px, py] = d3.pointer(ev, el);
+        tip.html(''); tip.append('div').attr('class', 'k').text(`${d.afi} · maxLength ${d.bucket}`);
+        tip.append('div').text(`${fmt(d.n)} VRPs`);
+        const tw = tip.node().offsetWidth; const left = Math.min(Math.max(0, px + 12), W - tw);
+        tip.style('left', left + 'px').style('top', Math.max(0, py - 40) + 'px').style('opacity', 1);
+        d3.select(this).attr('opacity', 0.8);
+      })
+      .on('mouseleave', function () { tip.style('opacity', 0); d3.select(this).attr('opacity', 1); });
+    svg.append('g').selectAll('text').data(buckets).join('text').attr('x', d => x0(d) + x0.bandwidth() / 2).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d);
+    // legend
+    const lg = svg.append('g').attr('transform', `translate(${m.l},12)`).attr('font-size', 'var(--cds-font-size-caption)');
+    let off = 0;
+    afis.forEach((a, i) => { const gi = lg.append('g').attr('transform', `translate(${off},0)`); gi.append('rect').attr('width', 10).attr('height', 10).attr('y', -8).attr('rx', 3).attr('fill', dash.colors[i]); const tx = gi.append('text').attr('x', 15).attr('fill', 'var(--color-fg)').text(a); off += 15 + tx.node().getComputedTextLength() + 16; });
+  }
+
+  function renderTop() {
+    const s = state('asns'); const t = document.getElementById('top-table');
+    if (s.status !== 'ok') { clear(t.querySelector('tbody')); return; }
+    drawTable('top-table', s.data.filter(r => r.routed === 'yes'), [
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numD('v4_24s', 0, 'announced IPv4 /24s', ['route']) }, { f: 'roa_status', render: statusCell },
+      { f: 'cov_v4_pct', render: covD('cov_v4_pct', 1, 'IPv4 space valid', ['route', 'status']) }, { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
+      { f: 'invalid', cls: 'num', render: (td, x) => { numD('invalid', -1, 'invalid routes', ['route', 'finding'])(td, x); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
+      { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'routes without ROA', ['route']) },
+      { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
+      { f: 'aspa', render: (td, x) => { td.textContent = x.aspa; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
+      { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'chg_total', render: chgCell }
+    ], { key: 'asn', count: 'top-count' });
+    syncTopControls(s.data);
+  }
+
+  let _asnMap = null, _asnSrc = null;
+  function asnMap() { const s = state('asns'); if (s.data !== _asnSrc) { _asnSrc = s.data; _asnMap = new Map((s.data || []).map(r => [r.asn, r])); } return _asnMap; }
+
+  function renderFindings() {
+    const s = state('findings'); if (s.status !== 'ok') return;
+    const st = tables['find-table'];
+    drawTable('find-table', s.data.filter(x => inScope(x.asn)), [
+      { f: 'severity', render: (td, x) => { sevCell(td, x); if (x.is_new === 'yes') { const r = asnMap().get(x.asn); badge(td, 'New', x.severity === 'High' || x.severity === 'Medium' ? 'bad' : 'neutral', () => ({ title: `New since ${prevLabel()}`, lines: ((r && r.changes) || []).filter(e => e.c === 'finding' && e.t.includes(x.category)) })); } } }, { f: 'category' }, { f: 'asn', render: asCell('asn') }, { f: 'name' },
+      { f: 'objects', cls: 'wrap mono' }, { f: 'detail', cls: 'wrap' }
+    ], { key: 'id', count: 'find-count', sorter: (st) => st.key === 'severity' ? ((a, b) => { const c = SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.v4_24s - a.v4_24s || a.asn - b.asn; return st.dir === 'asc' ? c : -c; }) : null });
+  }
+
+  function renderAspa() {
+    const s = state('aspa'); if (s.status !== 'ok') return;
+    drawTable('aspa-table', s.data.filter(x => inScope(x.customer)), [
+      { f: 'customer', render: asCell('customer') }, { f: 'name' }, { f: 'routed' }, { f: 'providers', cls: 'wrap', render: (td, x) => { td.textContent = x.providers; changesBadge(td, x, x.changes); } },
+      { f: 'provider_count', cls: 'num' }, { f: 'neighbours_seen', cls: 'wrap' },
+      { f: 'unlisted_neighbours', render: (td, x) => { td.textContent = x.unlisted_neighbours; if (x.unlisted_neighbours) td.style.color = 'var(--color-warn)'; } },
+      { f: 'unobserved_providers' }
+    ], { key: 'customer', count: 'aspa-count' });
+  }
+
+  function renderAsns() {
+    const s = state('asns'); if (s.status !== 'ok') return;
+    drawTable('asn-table', s.data.filter(x => inScope(x.asn)), [
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'routed' }, { f: 'roa_status', render: statusCell },
+      { f: 'prefixes_v4', cls: 'num', render: numD('prefixes_v4', 0, 'IPv4 announcements', ['route']) }, { f: 'prefixes_v6', cls: 'num', render: numD('prefixes_v6', 0, 'IPv6 announcements', ['route']) },
+      { f: 'valid', cls: 'num', render: numD('valid', 1, 'valid routes', ['route']) }, { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'NotFound routes', ['route']) },
+      { f: 'invalid', cls: 'num', render: (td, x) => { numD('invalid', -1, 'invalid routes', ['route', 'finding'])(td, x); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
+      { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
+      { f: 'vrps', cls: 'num', render: numD('vrps', 0, 'ROA prefixes', ['roa']) }, { f: 'wide_maxlen_v4', cls: 'num', render: numD('wide_maxlen_v4', -1, 'wide maxLength ROAs', ['roa', 'finding']) },
+      { f: 'loose_maxlen_v4', cls: 'num', render: numD('loose_maxlen_v4', -1, 'loose maxLength ROAs', ['roa', 'finding']) }, { f: 'unannounced_vrps', cls: 'num', render: numD('unannounced_vrps', -1, 'ROAs for unannounced space', ['roa', 'route', 'finding']) },
+      { f: 'aspa_providers', cls: 'wrap', render: (td, x) => { td.textContent = x.aspa_providers; changesBadge(td, x, (x.changes || []).filter(e => e.c === 'aspa')); } },
+      { f: 'upstreams_seen', cls: 'wrap' }, { f: 'ca_model' },
+      { f: 'high', cls: 'num', render: numD('high', -1, 'high-severity findings', ['finding']) }, { f: 'medium', cls: 'num', render: numD('medium', -1, 'medium findings', ['finding']) },
+      { f: 'chg_total', render: chgCell }
+    ], { key: 'asn', count: 'asn-count' });
+  }
+
+  function render() {
+    renderScope(); renderKpi(); renderAspaSub(); renderMeta(); renderKpiDeltas();
+    const cur = (document.querySelector('.nr-tab[aria-selected="true"]') || {}).dataset?.tab || 'overview';
+    if (cur === 'overview') {
+      renderTrend();
+      renderStatus();
+      renderPub();
+      renderSources();
+      hbars('cat-chart', 'cat_mix', r => `${r.category} · ${r.severity}`, r => sevColor(r.severity), scope === 'routed' ? 'n_routed' : 'n');
+      renderMaxlen();
+      renderTop();
+    }
+    if (cur === 'changes') renderChanges();
+    if (cur === 'findings') renderFindings();
+    if (cur === 'recs') renderRecs();
+    if (cur === 'aspa') renderAspa();
+    if (cur === 'asns') renderAsns();
+  }
+
+  function renderTrend() {
+    const el = document.getElementById('trend-chart'); const s = state('history');
+    if (s.status === 'error') return fail(el);
+    clear(el); if (s.status !== 'ok') return;
+    const W = el.clientWidth; if (!W) return;
+    el.style.minHeight = '200px';
+    const rows = s.data.map(d => ({ date: new Date(d.date + 'T00:00:00Z'), all: 100 * d.all_valid / d.routed, v4: d.v4_valid_pct, v6: d.v6_valid_pct }));
+    if (rows.length < 2) {
+      el.style.minHeight = '56px'; const p = document.createElement('div'); p.className = 'nr-fail';
+      p.textContent = 'The trend line appears after the second daily update.'; el.appendChild(p); return;
+    }
+    const series = [['all', 'All routes valid (share of ASNs)'], ['v4', 'IPv4 space valid'], ['v6', 'IPv6 space valid']];
+    const H = 200, m = { t: 30, r: 12, b: 24, l: 40 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const x = d3.scaleUtc(d3.extent(rows, d => d.date), [m.l, W - m.r]);
+    const lo = Math.max(0, Math.floor((d3.min(rows, d => Math.min(d.all, d.v4, d.v6)) - 5) / 10) * 10);
+    const y = d3.scaleLinear([lo, 100], [H - m.b, m.t]);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 6).attr('y', d => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d + '%');
+    const xt = x.ticks(Math.max(2, Math.floor(W / 110)));
+    svg.append('g').selectAll('text').data(xt).join('text').attr('x', d => x(d)).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d3.utcFormat('%b %-d')(d));
+    series.forEach(([k], i) => {
+      svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', dash.colors[i]).attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round')
+        .attr('d', d3.line().x(d => x(d.date)).y(d => y(d[k])));
+    });
+    const lg = svg.append('g').attr('transform', `translate(${m.l},12)`).attr('font-size', 'var(--cds-font-size-caption)');
+    let off = 0;
+    series.forEach(([k, label], i) => { const g = lg.append('g').attr('transform', `translate(${off},0)`); g.append('rect').attr('width', 10).attr('height', 10).attr('y', -8).attr('rx', 3).attr('fill', dash.colors[i]); const t = g.append('text').attr('x', 15).attr('fill', 'var(--color-fg)').text(`${label} ${d3.format('.1f')(rows[rows.length - 1][k])}%`); off += 15 + t.node().getComputedTextLength() + 16; });
+  }
+  function renderMeta() {
+    const s = state('meta'); const el = document.getElementById('meta-line');
+    if (s.status !== 'ok') return;
+    clear(el);
+    const now = new Date(), gen = toDate(s.data.generated);
+    const genDay = osloDay(gen);
+    const day = osloFmt({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(gen).replace(/,/g, '');
+    const time = osloFmt({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(gen);
+    const b = document.createElement('b'); b.textContent = 'The overview is updated daily.'; el.appendChild(b);
+    el.appendChild(document.createTextNode(` Last update: ${day} at ${time} Swedish time. ` +
+      `RPKI data built ${oslo(s.data.rpki_buildtime, genDay === osloDay(toDate(s.data.rpki_buildtime)) ? false : true)}, routing data up to ${oslo(s.data.ris_query, genDay === osloDay(toDate(s.data.ris_query)) ? false : true)}.`));
+    const ru = s.data.reused || {}, nRe = new Set([...(ru.announced || []), ...(ru.neighbours || [])]).size;
+    if (nRe) el.appendChild(document.createTextNode(` RIPEstat did not answer for ${nRe} network${nRe === 1 ? '' : 's'} in this update; ${nRe === 1 ? 'its' : 'their'} routing data is carried over from the previous update.`));
+    if (now - gen > 36 * 3600 * 1000) { const w = document.createElement('span'); w.style.color = 'var(--color-warn)'; w.textContent = ' The data is more than a day old; the next update is overdue.'; el.appendChild(w); }
+  }
+
+  dash.onData(render);
+
+  const named = location.hash.slice(1);
+  if (['overview', 'changes', 'findings', 'recs', 'aspa', 'asns', 'method'].includes(named)) showTab(named, false);
+})();
+</script>
+
+</div>
+</body>
+</html>

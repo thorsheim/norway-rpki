@@ -1,17 +1,27 @@
-# Norway RPKI: ROA & ASPA posture
+# Nordic RPKI: ROA & ASPA posture
 
-A public dashboard showing RPKI deployment for every Norwegian ASN: route-origin
-validity of every announcement, ROA quality (maxLength exposure, leftover ROAs) and
-ASPA records compared with observed upstreams.
+Public dashboards showing RPKI deployment for every ASN in Norway, Sweden, Finland and
+Denmark: route-origin validity of every announcement, ROA quality (maxLength exposure,
+leftover ROAs) and ASPA records compared with observed upstreams.
 
-Live at **https://rpki.thorsheim.net/** — rebuilt daily by a GitHub Action (`.github/workflows/update.yml`).
+| Country | Dashboard | Data |
+|---|---|---|
+| Norway | https://rpki.thorsheim.net/ | `docs/data/` |
+| Sweden | https://rpki.thorsheim.net/se/ | `docs/se/data/` |
+| Finland | https://rpki.thorsheim.net/fi/ | `docs/fi/data/` |
+| Denmark | https://rpki.thorsheim.net/dk/ | `docs/dk/data/` |
+
+Rebuilt daily by a GitHub Action (`.github/workflows/update.yml`). Each country is built
+separately, so one country failing does not hold back the others; a later run the same day
+retries only the countries that did not update.
 
 ## Data sources
 
 - **ROAs and ASPAs:** the full validated output (`rpki.json`) of the
-  [rpki-client console](https://console.rpki-client.org/), all five RIR trust anchors.
-- **Norwegian ASNs:** RIPEstat `country-resource-list` (NO), plus ASNs with registry
-  country NO in [ipverse/asn-info](https://github.com/ipverse/asn-info).
+  [rpki-client console](https://console.rpki-client.org/), all five RIR trust anchors
+  (downloaded once per run and shared by all countries).
+- **The country's ASNs:** RIPEstat `country-resource-list` for the country code, plus ASNs
+  with that registry country in [ipverse/asn-info](https://github.com/ipverse/asn-info).
 - **Announcements:** RIPEstat `announced-prefixes` (RIPE RIS), routes seen by at least
   10 RIS peers during the last 24 hours.
 - **Upstream-side neighbours:** RIPEstat `asn-neighbours`.
@@ -20,11 +30,16 @@ Every announcement is validated per RFC 6811 against every VRP worldwide.
 
 ## Files
 
-- `scripts/build_data.py` collects the data and writes `docs/data/*.json`.
-- `docs/index.html` is the dashboard (static, no build step).
-- `docs/data/history.json` keeps one row of headline figures per day.
-- `docs/data/changes_log.json` keeps every run's changes for the last 30 days.
-- `docs/data/state.json` is the per-ASN snapshot the next run compares against; `docs/data/no_changes.json` lists what changed since the previous run.
+- `scripts/build_data.py --country XX` collects the data for one country and writes
+  `<out>/<cc>_*.json` (e.g. `docs/se/data/se_asns_rpki.json`).
+- `site/template.html` is the dashboard page; `scripts/make_pages.py` writes one copy per
+  country (`docs/index.html` for Norway, `docs/<cc>/index.html` for the others) with the
+  country's name, time zone, flag and the country switcher. Edit the template, not the copies.
+- `scripts/daily_gate.py` decides which countries a run should build.
+- In each data folder: `history.json` keeps one row of headline figures per day,
+  `changes_log.json` every run's changes for the last 30 days, `state.json` the per-ASN
+  snapshot the next run compares against, and `<cc>_changes.json` what changed since the
+  previous run.
 
-Run locally with `python scripts/build_data.py --out docs/data` (Python 3.10+, no dependencies),
-then serve `docs/` with any static web server.
+Run locally with `python scripts/build_data.py --country SE --out docs/se/data`
+(Python 3.10+, no dependencies), then serve `docs/` with any static web server.

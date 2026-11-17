@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Build the Norway RPKI dashboard datasets.
+"""Build the Nordic RPKI dashboard datasets for one country (NO, SE, FI or DK).
 
 Collects:
   * every validated ROA and ASPA (rpki-client console, rpki.json, all five RIR trust anchors)
-  * Norwegian ASNs (RIPEstat country-resource-list NO + ipverse asn-info country NO)
+  * the country's ASNs (RIPEstat country-resource-list + ipverse asn-info registry country)
   * exact announcements per ASN (RIPEstat announced-prefixes, RIS, >=10 peers, last 24h)
   * upstream-side neighbours per routed ASN (RIPEstat asn-neighbours)
   * publication hosts of each ASN's ROAs/ASPAs (rpki-client console AS pages)
 
 Then validates every announcement (RFC 6811) against the full VRP set and writes
-docs/data/*.json for the static dashboard, plus a daily history of headline figures.
+<out>/<cc>_*.json for the static dashboard, plus a daily history of headline figures.
 
 Usage:
-  python scripts/build_data.py --out docs/data            # full run (needs internet)
-  python scripts/build_data.py --out X --from-raw raw.json  # re-analyse a saved raw snapshot
+  python scripts/build_data.py --country NO --out docs/data        # full run (needs internet)
+  python scripts/build_data.py --country SE --out docs/se/data --rpki-file /tmp/rpki.json  # share one rpki.json download
+  python scripts/build_data.py --country NO --out X --from-raw raw.json  # re-analyse a saved raw snapshot
 """
 import argparse
 import collections
@@ -36,6 +37,15 @@ RIPESTAT = "https://stat.ripe.net/data"
 CONSOLE = "https://console.rpki-client.org"
 IPVERSE_ASINFO = "https://raw.githubusercontent.com/ipverse/asn-info/master/as.csv"
 MIN_PEERS = 10
+
+COUNTRIES = {
+    "NO": {"name": "Norway", "adj": "Norwegian", "tz": "Europe/Oslo"},
+    "SE": {"name": "Sweden", "adj": "Swedish", "tz": "Europe/Stockholm"},
+    "FI": {"name": "Finland", "adj": "Finnish", "tz": "Europe/Helsinki"},
+    "DK": {"name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen"},
+}
+CC = "NO"  # set from --country in main()
+C = COUNTRIES[CC]
 
 
 def log(*a):
@@ -99,12 +109,18 @@ def rov(idx, prefix, origin):
 MAX_REUSE = 0.10  # give up if RIPEstat fails for more than 10% of the networks
 
 
-def collect(prev_rows=(), prev_state=None):
+def collect(prev_rows=(), prev_state=None, rpki_file=None):
     now = dt.datetime.now(dt.timezone.utc)
     prev_asns = (prev_state or {}).get("asns", {})
     prev_up = {str(r["asn"]): r.get("upstreams_seen", "") for r in prev_rows}
-    log("downloading rpki.json")
-    rpki = get(f"{CONSOLE}/rpki.json", timeout=900)
+    if rpki_file and os.path.exists(rpki_file):
+        log("reading", rpki_file)
+        rpki = json.load(open(rpki_file))
+    else:
+        log("downloading rpki.json")
+        rpki = get(f"{CONSOLE}/rpki.json", timeout=900)
+        if rpki_file:
+            json.dump(rpki, open(rpki_file, "w"))
     log("rpki.json:", len(rpki["roas"]), "VRPs,", len(rpki.get("aspas", [])), "ASPAs, built", rpki["metadata"]["buildtime"])
 
     log("ASN lists")
@@ -112,11 +128,11 @@ def collect(prev_rows=(), prev_state=None):
     names, ipverse_no = {}, set()
     for row in csv.DictReader(io.StringIO(ascsv)):
         names[row["asn"]] = row["description"]
-        if row["country-code"] == "NO":
+        if row["country-code"] == CC:
             ipverse_no.add(int(row["asn"]))
     rir_no = set()
     try:
-        cr = get(f"{RIPESTAT}/country-resource-list/data.json?resource=NO&sourceapp={SOURCEAPP}")
+        cr = get(f"{RIPESTAT}/country-resource-list/data.json?resource={CC}&sourceapp={SOURCEAPP}")
         cr_asns = cr["data"]["resources"]["asn"]
     except Exception as e:  # RIPEstat hiccup: reuse yesterday's RIPE NCC list rather than failing the run
         cr_asns = [r["asn"] for r in prev_rows if r.get("in_rir_list") == "yes"]
@@ -392,10 +408,10 @@ def analyze(raw, prev_rows):
         if mig:
             add("Medium", "ROA for space another AS originates", a,
                 [f"{n}-{ml} (now {', '.join('AS' + str(o) for o in os_)})" for n, ml, os_ in mig],
-                f"ROAs authorise AS{a} for space that another Norwegian AS announces — a typical leftover after a migration. AS{a}, or anyone forging it, stays valid there.")
+                f"ROAs authorise AS{a} for space that another {C['adj']} AS announces — a typical leftover after a migration. AS{a}, or anyone forging it, stays valid there.")
         if unann:
             add("Low", "ROA for unannounced space", a, [f"{n}-{ml}" for n, ml in unann],
-                "ROAs cover space nobody in Norway announces. Fine for backup/DDoS-scrubbing; otherwise an AS0 ROA or removal is safer.")
+                f"ROAs cover space nobody in {C['name']} announces. Fine for backup/DDoS-scrubbing; otherwise an AS0 ROA or removal is safer.")
         if d["aspa"]:
             if provs == [0]:
                 add("High" if routed and nb else "Info", "ASPA declares no providers (AS0)", a, ["AS0"],
@@ -476,10 +492,10 @@ def diff_state(prev, cur):
     for a in sorted(set(P) | set(C), key=int):
         p, c, ev = P.get(a), C.get(a), []
         if p is None:
-            ev.append({"k": "+", "g": 0, "c": "asn", "t": "Newly counted as a Norwegian ASN"})
+            ev.append({"k": "+", "g": 0, "c": "asn", "t": f"Newly counted as a {C['adj']} ASN"})
             p = {"st": "Not routed", "ann": {}, "v": [], "aspa": [], "f": {}}
         if c is None:
-            out[a] = [{"k": "-", "g": 0, "c": "asn", "t": "No longer in the list of Norwegian ASNs"}]
+            out[a] = [{"k": "-", "g": 0, "c": "asn", "t": f"No longer in the list of {C['adj']} ASNs"}]
             continue
         if p["st"] != c["st"]:
             ra, rb = STATUS_RANK.get(p["st"]), STATUS_RANK.get(c["st"])
@@ -590,23 +606,24 @@ def attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state):
     return flat
 
 
-SOURCES = [
+def sources():
+    return [
     {"name": "rpki-client console", "url": "https://console.rpki-client.org/", "what": "All validated ROAs (VRPs) and ASPAs from the five RIR trust anchors (rpki.json), plus each ASN's object page, used for where the objects are published.", "time": "rpki_buildtime"},
     {"name": "RIPEstat announced-prefixes", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/announced-prefixes", "what": "Exact prefixes each ASN announces, as seen by RIPE RIS route collectors (at least 10 RIS peers, last 24 hours).", "time": "ris_query"},
     {"name": "RIPEstat asn-neighbours", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/asn-neighbours", "what": "Neighbours seen on the upstream side of each routed ASN in RIS AS paths, compared with ASPA provider sets.", "time": "nb_query"},
-    {"name": "RIPEstat country-resource-list", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/country-resource-list", "what": "ASNs that RIPE NCC has delegated to Norway (NO).", "time": None},
-    {"name": "ipverse asn-info", "url": "https://github.com/ipverse/asn-info", "what": "Network names for every ASN, and ASNs whose registry country is NO (added to the RIPE NCC list).", "time": None},
-]
+    {"name": "RIPEstat country-resource-list", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/country-resource-list", "what": f"ASNs that RIPE NCC has delegated to {C['name']} ({CC}).", "time": None},
+    {"name": "ipverse asn-info", "url": "https://github.com/ipverse/asn-info", "what": f"Network names for every ASN, and ASNs whose registry country is {CC} (added to the RIPE NCC list).", "time": None},
+    ]
 
 LOG_DAYS = 30
 
 
 def local_date(ts):
-    """Calendar date of a UTC timestamp in Norway."""
+    """Calendar date of a UTC timestamp in the country's time zone."""
     t = dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
     try:
         from zoneinfo import ZoneInfo
-        t = t.astimezone(ZoneInfo("Europe/Oslo"))
+        t = t.astimezone(ZoneInfo(C["tz"]))
     except Exception:
         pass
     return t.strftime("%Y-%m-%d")
@@ -641,24 +658,32 @@ def headline(rows, F, raw):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
+    ap.add_argument("--country", default="NO", choices=sorted(COUNTRIES))
+    ap.add_argument("--rpki-file", help="cache for rpki.json, shared between countries in one run")
     ap.add_argument("--from-raw")
     ap.add_argument("--save-raw")
     args = ap.parse_args()
+    global CC, C
+    CC, C = args.country, COUNTRIES[args.country]
+    px = CC.lower() + "_"
     os.makedirs(args.out, exist_ok=True)
     rd = lambda name, default: json.load(open(os.path.join(args.out, name))) if os.path.exists(os.path.join(args.out, name)) else default
-    prev_rows = rd("no_asns_rpki.json", [])
+    prev_rows = rd(px + "asns_rpki.json", [])
     prev_meta = rd("meta.json", {})
     prev_state = rd("state.json", None)
-    raw = json.load(open(args.from_raw)) if args.from_raw else collect(prev_rows, prev_state)
+    raw = json.load(open(args.from_raw)) if args.from_raw else collect(prev_rows, prev_state, args.rpki_file)
     if args.save_raw:
         json.dump(raw, open(args.save_raw, "w"))
     if prev_state is None and prev_rows:
-        prev_state = state_from_files(prev_rows, rd("no_vrps.json", []), rd("no_aspa.json", []), rd("no_findings.json", []), prev_meta)
+        prev_state = state_from_files(prev_rows, rd(px + "vrps.json", []), rd(px + "aspa.json", []), rd(px + "findings.json", []), prev_meta)
     rows, V, ASP, F = analyze(raw, prev_rows)
     # sanity guard: refuse to overwrite good data with an obviously broken run
+    # (scaled to the previous run, so it works for small and large countries alike)
     routed = sum(r["routed"] == "yes" for r in rows)
-    if routed < 150 or len(V) < 500:
-        log(f"sanity check failed (routed={routed}, vrps={len(V)}); keeping previous data")
+    prev_routed = sum(r["routed"] == "yes" for r in prev_rows)
+    prev_vrps = (prev_meta.get("headline") or {}).get("vrps") or len(rd(px + "vrps.json", []))
+    if routed < max(50, 0.7 * prev_routed) or len(V) < max(100, 0.7 * prev_vrps):
+        log(f"sanity check failed (routed={routed} vs {prev_routed}, vrps={len(V)} vs {prev_vrps}); keeping previous data")
         sys.exit(1)
     dump = lambda name, obj: json.dump(obj, open(os.path.join(args.out, name), "w"), separators=(",", ":"), ensure_ascii=False)
     cur_state = make_state(raw, rows, F)
@@ -666,12 +691,12 @@ def main():
     changes = attach_changes(rows, F, ASP, events, prev_rows, prev_state, cur_state)
     for f in F:
         del f["_objs"]
-    dump("no_asns_rpki.json", rows)
-    dump("no_vrps.json", V)
-    dump("no_aspa.json", ASP)
-    dump("no_findings.json", F)
-    dump("no_changes.json", changes)
-    dump("no_publication.json", publication_table(raw, raw.get("names", {})))
+    dump(px + "asns_rpki.json", rows)
+    dump(px + "vrps.json", V)
+    dump(px + "aspa.json", ASP)
+    dump(px + "findings.json", F)
+    dump(px + "changes.json", changes)
+    dump(px + "publication.json", publication_table(raw, raw.get("names", {})))
     chglog = update_changes_log(rd("changes_log.json", {"runs": []}), raw["meta"]["generated"],
                              (prev_state or {}).get("generated"),
                              "partial" if (prev_state or {}).get("partial") else "full", changes) if prev_state else rd("changes_log.json", {"runs": []})
@@ -688,7 +713,7 @@ def main():
                        "prev_rpki_buildtime": (prev_state or {}).get("rpki_buildtime"),
                        "prev_headline": prev_meta.get("headline"),
                        "changes_detail": "partial" if (prev_state or {}).get("partial") else ("full" if prev_state else "none"),
-                       "sources": SOURCES})
+                       "country": {"code": CC, **C}, "sources": sources()})
     log("done:", h)
 
 
