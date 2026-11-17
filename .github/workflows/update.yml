@@ -18,7 +18,7 @@ on:
         default: "false"
   push:
     branches: [main]
-    paths-ignore: ["docs/data/**"]
+    paths-ignore: ["docs/data/**", "docs/*/data/**"]
 
 permissions:
   contents: write
@@ -34,7 +34,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
+      # Always work on the newest main, not the commit that triggered the run: otherwise a run
+      # started by a code push can redeploy a tree without the data committed in the meantime.
       - uses: actions/checkout@v7
+        with:
+          ref: main
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
