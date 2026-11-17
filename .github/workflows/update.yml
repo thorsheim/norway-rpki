@@ -32,7 +32,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -44,12 +44,12 @@ jobs:
           EVENT: ${{ github.event_name }}
           SCHEDULED: ${{ inputs.scheduled }}
         run: python scripts/daily_gate.py >> "$GITHUB_OUTPUT"
-      - name: Build datasets (retries after 10 minutes on failure)
+      - name: Build datasets (one retry after 5 minutes on failure)
         if: steps.gate.outputs.build == 'true'
         run: |
-          for attempt in 1 2 3; do
+          for attempt in 1 2; do
             python scripts/build_data.py --out docs/data && exit 0
-            echo "Attempt $attempt failed"; [ $attempt -lt 3 ] && sleep 600
+            echo "Attempt $attempt failed"; [ $attempt -lt 2 ] && sleep 300
           done
           exit 1
       - name: Commit data

@@ -366,7 +366,7 @@ window.dash = (function () {
     </div>
     <div class="nr-card nr-full" id="sources-card">
       <h2>Data sources</h2>
-      <p class="note">Everything on this page is computed from these public sources every day at 08:00 Norwegian time. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
+      <p class="note">Everything on this page is computed from these public sources once a day. The times show when the data used in this update was produced. The raw results are linked at the bottom of the page.</p>
       <div data-source="meta" id="sources-list" class="nr-sources"></div>
     </div>
   </section>
@@ -1348,7 +1348,7 @@ window.dash = (function () {
     const f = (t) => t ? oslo(t) + ' Norwegian time' : null;
     const extra = { rpki_buildtime: m.data.global_vrps ? `${fmt(m.data.global_vrps)} VRPs and ${fmt(m.data.global_aspas)} ASPAs worldwide in this build.` : '' };
     const src = m.data.sources || [];
-    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt every day at 08:00 Norwegian time by a GitHub Action.', time: 'generated' }]).forEach(x => {
+    src.concat([{ name: 'This dashboard', url: 'https://github.com/thorsheim/norway-rpki', what: 'Open-source pipeline and page; rebuilt daily by a GitHub Action.', time: 'generated' }]).forEach(x => {
       const d = document.createElement('div'); d.className = 'nr-src';
       const a = document.createElement('a'); a.href = x.url; a.textContent = x.name; a.rel = 'noopener'; d.appendChild(a);
       const w = document.createElement('div'); w.className = 'w'; w.textContent = x.what + (extra[x.time] ? ' ' + extra[x.time] : ''); d.appendChild(w);
@@ -1525,14 +1525,15 @@ window.dash = (function () {
     if (s.status !== 'ok') return;
     clear(el);
     const now = new Date(), gen = toDate(s.data.generated);
-    const today = osloDay(now), genDay = osloDay(gen);
-    const nowH = Number(osloFmt({ hour: '2-digit', hourCycle: 'h23' }).format(now));
-    const next = nowH < 8 ? 'today at 08:00' : 'tomorrow at 08:00';
-    const b = document.createElement('b'); b.textContent = 'Updated every day at 08:00 Norwegian time.'; el.appendChild(b);
-    el.appendChild(document.createTextNode(` Last update ${genDay === today ? 'today ' + oslo(s.data.generated, false) : oslo(s.data.generated)} · next ${next}. ` +
-      `RPKI data built ${oslo(s.data.rpki_buildtime, genDay === osloDay(toDate(s.data.rpki_buildtime)) ? false : true)}, routing data up to ${oslo(s.data.ris_query, false)}.`));
-    const late = genDay !== today && nowH >= 10;
-    if (late) { const w = document.createElement('span'); w.style.color = 'var(--color-warn)'; w.textContent = ' Today’s update has not run yet.'; el.appendChild(w); }
+    const genDay = osloDay(gen);
+    const day = osloFmt({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(gen).replace(/,/g, '');
+    const time = osloFmt({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(gen);
+    const b = document.createElement('b'); b.textContent = 'The overview is updated daily.'; el.appendChild(b);
+    el.appendChild(document.createTextNode(` Last update: ${day} at ${time} Norwegian time. ` +
+      `RPKI data built ${oslo(s.data.rpki_buildtime, genDay === osloDay(toDate(s.data.rpki_buildtime)) ? false : true)}, routing data up to ${oslo(s.data.ris_query, genDay === osloDay(toDate(s.data.ris_query)) ? false : true)}.`));
+    const ru = s.data.reused || {}, nRe = new Set([...(ru.announced || []), ...(ru.neighbours || [])]).size;
+    if (nRe) el.appendChild(document.createTextNode(` RIPEstat did not answer for ${nRe} network${nRe === 1 ? '' : 's'} in this update; ${nRe === 1 ? 'its' : 'their'} routing data is carried over from the previous update.`));
+    if (now - gen > 36 * 3600 * 1000) { const w = document.createElement('span'); w.style.color = 'var(--color-warn)'; w.textContent = ' The data is more than a day old; the next update is overdue.'; el.appendChild(w); }
   }
 
   dash.onData(render);

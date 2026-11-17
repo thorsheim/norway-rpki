@@ -96,8 +96,13 @@ def rov(idx, prefix, origin):
 
 
 # ---------------------------------------------------------------- collection
-def collect(prev_rows=()):
+MAX_REUSE = 0.10  # give up if RIPEstat fails for more than 10% of the networks
+
+
+def collect(prev_rows=(), prev_state=None):
     now = dt.datetime.now(dt.timezone.utc)
+    prev_asns = (prev_state or {}).get("asns", {})
+    prev_up = {str(r["asn"]): r.get("upstreams_seen", "") for r in prev_rows}
     log("downloading rpki.json")
     rpki = get(f"{CONSOLE}/rpki.json", timeout=900)
     log("rpki.json:", len(rpki["roas"]), "VRPs,", len(rpki.get("aspas", [])), "ASPAs, built", rpki["metadata"]["buildtime"])
@@ -130,13 +135,22 @@ def collect(prev_rows=()):
 
     start = (now - dt.timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
+    reused = {"announced": [], "neighbours": []}
+
     def announced(a):
-        j = get(f"{RIPESTAT}/announced-prefixes/data.json?resource=AS{a}&starttime={start}"
-                f"&min_peers_seeing={MIN_PEERS}&sourceapp={SOURCEAPP}")
-        return a, [p["prefix"] for p in j["data"].get("prefixes", [])], j["data"].get("query_endtime")
+        try:
+            j = get(f"{RIPESTAT}/announced-prefixes/data.json?resource=AS{a}&starttime={start}"
+                    f"&min_peers_seeing={MIN_PEERS}&sourceapp={SOURCEAPP}", tries=4, timeout=90)
+            return a, [p["prefix"] for p in j["data"].get("prefixes", [])], j["data"].get("query_endtime")
+        except Exception as e:  # one failing network should not sink the whole run: reuse yesterday's prefixes
+            log(f"announced-prefixes AS{a} failed ({e}); reusing the previous run")
+            reused["announced"].append(a)
+            return a, sorted((prev_asns.get(str(a)) or {}).get("ann") or {}), None
 
     log("announced prefixes")
     ann = {a: (p, qt) for a, p, qt in pmap(announced, universe)}
+    if len(reused["announced"]) > MAX_REUSE * len(universe):
+        raise RuntimeError(f"announced-prefixes failed for {len(reused['announced'])} of {len(universe)} ASNs")
 
     log("validating")
     idx = build_index(rpki["roas"])
@@ -151,12 +165,22 @@ def collect(prev_rows=()):
     routed = [a for a in universe if ann[a][0]]
 
     def neighbours(a):
-        j = get(f"{RIPESTAT}/asn-neighbours/data.json?resource=AS{a}&sourceapp={SOURCEAPP}")
-        nb = [[n["asn"], n["power"]] for n in j["data"].get("neighbours", []) if n.get("type") == "left"]
-        return a, nb, j["data"].get("query_endtime")
+        try:
+            j = get(f"{RIPESTAT}/asn-neighbours/data.json?resource=AS{a}&sourceapp={SOURCEAPP}", tries=4, timeout=90)
+            nb = [[n["asn"], n["power"]] for n in j["data"].get("neighbours", []) if n.get("type") == "left"]
+            return a, nb, j["data"].get("query_endtime")
+        except Exception as e:  # reuse yesterday's neighbours (full list from state.json, else the top six shown on the page)
+            log(f"asn-neighbours AS{a} failed ({e}); reusing the previous run")
+            reused["neighbours"].append(a)
+            nb = (prev_asns.get(str(a)) or {}).get("nb")
+            if nb is None:
+                nb = [[int(x[2:]), 0] for x in prev_up.get(str(a), "").split(", ") if x.startswith("AS")]
+            return a, nb, None
 
     log("neighbours")
     nbs = {a: (nb, qt) for a, nb, qt in pmap(neighbours, routed)}
+    if len(reused["neighbours"]) > MAX_REUSE * max(1, len(routed)):
+        raise RuntimeError(f"asn-neighbours failed for {len(reused['neighbours'])} of {len(routed)} ASNs")
 
     def hosts(a):
         """Per object on the console page: [type, publication host, number of prefixes/providers]."""
@@ -183,7 +207,8 @@ def collect(prev_rows=()):
                     "ris_query": next((qt for p, qt in ann.values() if qt), None),
                     "nb_query": next((qt for nb, qt in nbs.values() if qt), None),
                     "generated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "global_vrps": len(rpki["roas"]), "global_aspas": len(rpki.get("aspas", []))},
+                    "global_vrps": len(rpki["roas"]), "global_aspas": len(rpki.get("aspas", [])),
+                    "reused": {k: sorted(v) for k, v in reused.items()}},
            "names": {str(a): names.get(str(a), "") for a in set(universe) | {p for v in aspa_by.values() for s in v for p in s}},
            "asns": {}}
     for a in universe:
@@ -414,6 +439,7 @@ def make_state(raw, rows, F):
         s["ann"] = {x["p"]: x["s"] for x in d["ann"]}
         s["v"] = sorted({f"{p}-{ml}" for p, ml, *_ in d["v"]})
         s["aspa"] = sorted({p for x in d["aspa"] for p in x})
+        s["nb"] = d["nb"]
     for f in F:
         st[f["asn"]]["f"].setdefault(f"{f['severity']}|{f['category']}", []).extend(f["_objs"])
     return {"generated": raw["meta"]["generated"], "rpki_buildtime": raw["meta"]["rpki_buildtime"],
@@ -619,14 +645,13 @@ def main():
     ap.add_argument("--save-raw")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
-    prev_path0 = os.path.join(args.out, "no_asns_rpki.json")
-    raw = json.load(open(args.from_raw)) if args.from_raw else collect(json.load(open(prev_path0)) if os.path.exists(prev_path0) else [])
-    if args.save_raw:
-        json.dump(raw, open(args.save_raw, "w"))
     rd = lambda name, default: json.load(open(os.path.join(args.out, name))) if os.path.exists(os.path.join(args.out, name)) else default
     prev_rows = rd("no_asns_rpki.json", [])
     prev_meta = rd("meta.json", {})
     prev_state = rd("state.json", None)
+    raw = json.load(open(args.from_raw)) if args.from_raw else collect(prev_rows, prev_state)
+    if args.save_raw:
+        json.dump(raw, open(args.save_raw, "w"))
     if prev_state is None and prev_rows:
         prev_state = state_from_files(prev_rows, rd("no_vrps.json", []), rd("no_aspa.json", []), rd("no_findings.json", []), prev_meta)
     rows, V, ASP, F = analyze(raw, prev_rows)
