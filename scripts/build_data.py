@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Nordic RPKI dashboard datasets for one country (NO, SE, FI or DK).
+"""Build the RPKI dashboard datasets for one country (NO, SE, FI, DK or CZ).
 
 Collects:
   * every validated ROA and ASPA (rpki-client console, rpki.json, all five RIR trust anchors)
@@ -43,6 +43,7 @@ COUNTRIES = {
     "SE": {"name": "Sweden", "adj": "Swedish", "tz": "Europe/Stockholm"},
     "FI": {"name": "Finland", "adj": "Finnish", "tz": "Europe/Helsinki"},
     "DK": {"name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen"},
+    "CZ": {"name": "Czech Republic", "in": "the Czech Republic", "adj": "Czech", "tz": "Europe/Prague"},
 }
 CC = "NO"  # set from --country in main()
 C = COUNTRIES[CC]
@@ -411,7 +412,7 @@ def analyze(raw, prev_rows):
                 f"ROAs authorise AS{a} for space that another {C['adj']} AS announces — a typical leftover after a migration. AS{a}, or anyone forging it, stays valid there.")
         if unann:
             add("Low", "ROA for unannounced space", a, [f"{n}-{ml}" for n, ml in unann],
-                f"ROAs cover space nobody in {C['name']} announces. Fine for backup/DDoS-scrubbing; otherwise an AS0 ROA or removal is safer.")
+                f"ROAs cover space nobody in {C.get('in', C['name'])} announces. Fine for backup/DDoS-scrubbing; otherwise an AS0 ROA or removal is safer.")
         if d["aspa"]:
             if provs == [0]:
                 add("High" if routed and nb else "Info", "ASPA declares no providers (AS0)", a, ["AS0"],
@@ -611,7 +612,7 @@ def sources():
     {"name": "rpki-client console", "url": "https://console.rpki-client.org/", "what": "All validated ROAs (VRPs) and ASPAs from the five RIR trust anchors (rpki.json), plus each ASN's object page, used for where the objects are published.", "time": "rpki_buildtime"},
     {"name": "RIPEstat announced-prefixes", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/announced-prefixes", "what": "Exact prefixes each ASN announces, as seen by RIPE RIS route collectors (at least 10 RIS peers, last 24 hours).", "time": "ris_query"},
     {"name": "RIPEstat asn-neighbours", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/asn-neighbours", "what": "Neighbours seen on the upstream side of each routed ASN in RIS AS paths, compared with ASPA provider sets.", "time": "nb_query"},
-    {"name": "RIPEstat country-resource-list", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/country-resource-list", "what": f"ASNs that RIPE NCC has delegated to {C['name']} ({CC}).", "time": None},
+    {"name": "RIPEstat country-resource-list", "url": "https://stat.ripe.net/docs/data-api/api-endpoints/country-resource-list", "what": f"ASNs that RIPE NCC has delegated to {C.get('in', C['name'])} ({CC}).", "time": None},
     {"name": "ipverse asn-info", "url": "https://github.com/ipverse/asn-info", "what": f"Network names for every ASN, and ASNs whose registry country is {CC} (added to the RIPE NCC list).", "time": None},
     ]
 

@@ -553,7 +553,7 @@ window.dash = (function () {
     <div class="nr-method">
       <h3>Where the data comes from</h3>
       <ul>
-        <li><b>Which ASNs are {{ADJ}}:</b> ASNs delegated to {{NAME}} by RIPE NCC (RIPEstat country resource list), plus ASNs whose registry country is {{CC}} in the ipverse <i>asn-info</i> dataset.</li>
+        <li><b>Which ASNs are {{ADJ}}:</b> ASNs delegated to {{NAME_IN}} by RIPE NCC (RIPEstat country resource list), plus ASNs whose registry country is {{CC}} in the ipverse <i>asn-info</i> dataset.</li>
         <li><b>What each AS announces:</b> exact prefixes from RIPEstat <i>announced-prefixes</i> (RIPE RIS), counting only routes seen by at least 10 RIS peers during the last day.</li>
         <li><b>ROAs and ASPAs:</b> the complete validated output (<i>rpki.json</i>) of the rpki-client console, covering all five RIR trust anchors. The time of the build is in Sources.</li>
         <li><b>Upstream-side neighbours:</b> RIPEstat <i>asn-neighbours</i> (left neighbours in RIS AS paths), with the number of RIS peers that see each link.</li>
@@ -571,7 +571,7 @@ window.dash = (function () {
       </ul>
       <h3>What this does not show</h3>
       <ul>
-        <li>Routes seen by fewer than 10 RIS peers, or only inside {{NAME}}.</li>
+        <li>Routes seen by fewer than 10 RIS peers, or only inside {{NAME_IN}}.</li>
         <li>Whether {{ADJ}} networks drop invalid routes (ROV enforcement).</li>
         <li>AS0 ROAs and ROA expiry dates.</li>
         <li>{{ADJ}} networks that use an ASN registered in another country.</li>
@@ -908,7 +908,7 @@ window.dash = (function () {
           }
           case 'ROA for unannounced space':
             action = 'Replace ROAs for unused space with AS0 ROAs, or remove them.';
-            steps = [`ROA prefixes not announced by anyone in {{NAME}}: ${list(obj, n)}.`,
+            steps = [`ROA prefixes not announced by anyone in {{NAME_IN}}: ${list(obj, n)}.`,
               'If the space is unused, an AS0 ROA makes every announcement of it invalid, which blocks squatting.',
               'If it is kept for backup or DDoS scrubbing, keep the ROA but with maxLength equal to the prefix length.'];
             link = L.rfc6483;
