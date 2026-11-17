@@ -222,7 +222,7 @@ a { color: inherit; }
 
   <section class="nr-card nr-full" aria-labelledby="h-full">
     <h2 id="h-full">Networks with full ROA coverage and ASPA</h2>
-    <p class="note">Routed networks where every announcement is RPKI-valid <i>and</i> the AS publishes an ASPA. These are fully protected by both route-origin validation and, where ASPA is enforced, path validation. Largest IPv4 space first; click a column to sort. Remaining findings are listed so you can see who still has loose ends, such as wide maxLength or a provider missing from the ASPA.</p>
+    <p class="note">Routed networks where every announcement is RPKI-valid <i>and</i> the AS publishes an ASPA, so their routes are covered by route-origin validation and, where ASPA is enforced, path validation. That is not a clean bill of health: a few still have a high-severity finding, a wide maxLength that lets a forged-origin more-specific validate, and others have smaller loose ends. They are listed under Remaining findings; the country pages explain each one. Largest IPv4 space first; click a column to sort.</p>
     <div class="nr-filters">
       <div class="nr-countchips" id="full-chips" role="group" aria-label="Country"></div>
       <label>Search<input class="nr-search" id="full-search" type="search" placeholder="ASN or name"></label>

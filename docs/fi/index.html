@@ -589,7 +589,7 @@ window.dash = (function () {
 <script>
 (function () {
   const fmt = d3.format(',');
-  const pct = (v) => (v == null || isNaN(v)) ? '—' : (Math.round(v * 10) / 10) + '%';
+  const pct = (v) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(1) + '%';
   const SEV_RANK = { High: 0, Medium: 1, Low: 2, Info: 3 };
   const sevColor = (s) => s === 'High' ? 'var(--cds-chart-status-critical)' : s === 'Medium' ? dash.colors[2] : s === 'Low' ? dash.colors[0] : 'var(--cds-chart-muted)';
 
@@ -1013,6 +1013,12 @@ window.dash = (function () {
       });
       tb.appendChild(tr);
     });
+    if (!r.length) {
+      const tr = document.createElement('tr'), td = document.createElement('td');
+      td.colSpan = cols.length; td.style.cssText = 'text-align:center;padding:18px;color:var(--color-fg-muted)';
+      td.textContent = rows.length ? 'No rows match these filters.' : (opts.empty || 'Nothing to show yet.');
+      tr.appendChild(td); tb.appendChild(tr);
+    }
     if (opts.count) document.getElementById(opts.count).textContent = r.length === rows.length ? `${fmt(rows.length)} rows` : `${fmt(r.length)} of ${fmt(rows.length)} rows`;
   }
   const asCell = (f) => (td, x) => { td.textContent = 'AS' + x[f]; };
@@ -1202,7 +1208,7 @@ window.dash = (function () {
     const want = [''].concat(days.map(d => d.date)).join(',');
     if (sel.dataset.opts !== want) {
       clear(sel);
-      const o0 = document.createElement('option'); o0.value = ''; o0.textContent = `All ${days.length} days with updates`; sel.appendChild(o0);
+      const o0 = document.createElement('option'); o0.value = ''; o0.textContent = days.length ? `All ${days.length} days with updates` : 'No updates compared yet'; sel.appendChild(o0);
       days.forEach(d => { const o = document.createElement('option'); o.value = d.date; o.textContent = `${dayFmt(d.date)} (${d.bad + d.good + d.neutral})`; sel.appendChild(o); });
       sel.dataset.opts = want;
     }
@@ -1214,7 +1220,7 @@ window.dash = (function () {
       { f: 'date', render: (td, x) => { td.textContent = dayFmt(x.date); td.style.whiteSpace = 'nowrap'; } },
       { f: 'good', render: (td, x) => { const b = document.createElement('span'); b.className = 'nr-d ' + toneOf(x.good); b.style.marginLeft = '0'; b.style.cursor = 'default'; b.textContent = x.kind === '+' ? '+' : x.kind === '-' ? '−' : '~'; td.appendChild(b); } },
       { f: 'area' }, { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'text', cls: 'wrap mono' }
-    ], { key: 'id', count: 'chg-count', sorter: (st) => {
+    ], { key: 'id', count: 'chg-count', empty: 'No changes yet. Changes are listed from the second daily update on, when there is a previous update to compare with.', sorter: (st) => {
       if (st.key === 'date') return (a, b) => (st.dir === 'asc' ? 1 : -1) * a.date.localeCompare(b.date) || (st.dir === 'asc' ? a._i - b._i : (b.generated.localeCompare(a.generated) || a._i - b._i));
       if (st.key === 'good') return (a, b) => (st.dir === 'asc' ? 1 : -1) * (a.good - b.good) || b.date.localeCompare(a.date) || a._i - b._i;
       return null;
