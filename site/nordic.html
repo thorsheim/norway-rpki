@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordic RPKI overview</title>
+<meta name="description" content="RPKI route-origin validation and ASPA deployment in Norway, Sweden, Finland and Denmark, ranked side by side, plus every network with full ROA coverage and ASPA.">
+<link rel="canonical" href="https://rpki.thorsheim.net/nordic/">
+<meta property="og:url" content="https://rpki.thorsheim.net/nordic/">
+<meta property="og:title" content="Nordic RPKI overview">
+<meta property="og:description" content="Norway, Sweden, Finland and Denmark ranked on RPKI ROA and ASPA deployment, updated daily.">
+<link rel="icon" href="{{ICON}}">
+<style>
+{{CSS}}
+/* overview page */
+.nr-rank { display: inline-flex; align-items: center; justify-content: center; width: 1.7em; height: 1.7em; border-radius: 50%; font-weight: 600; background: var(--cds-chart-grid); }
+.nr-rank.r1 { background: color-mix(in srgb, var(--color-ok) 22%, transparent); color: var(--color-ok); }
+.nr-rankt .nr-cov { min-width: 6.5rem; }
+.nr-rankt td { white-space: nowrap; }
+.nr-cc { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
+.nr-cc img { width: 18px; height: 18px; border-radius: 4px; }
+.nr-cc a { text-decoration: none; }
+.nr-cc a:hover { text-decoration: underline; }
+.nr td .sub { display: block; color: var(--color-fg-muted); font-weight: 400; }
+.nr th.rank-col, .nr td.rank-col { width: 3rem; text-align: center; }
+.nr th[aria-sort] button::after { content: " ↓"; }
+.nr-provs { color: var(--color-fg-muted); }
+.nr-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--cds-gap-sm); }
+.nr-countchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nr-countchips .nr-chip img { width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.nr-ok { color: var(--color-ok); }
+.nr-empty { padding: 18px; text-align: center; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+</style>
+</head>
+<body>
+<div id="dash-root">
+<div class="nr">
+  <div class="nr-head">
+{{SWITCHER}}
+    <h1>Nordic RPKI overview</h1>
+    <p class="nr-meta" id="meta-line">Loading the four country dashboards…</p>
+    <p class="nr-take" id="takeaway">&nbsp;</p>
+  </div>
+
+  <section class="nr-card nr-full" aria-labelledby="h-rank">
+    <h2 id="h-rank">Countries ranked</h2>
+    <p class="note" id="rank-note">Ranked by the share of routed networks whose every announcement is RPKI-valid; ties go to the larger share of IPv4 space that is RPKI-valid. Click a column heading to rank by that measure instead (best first). Figures cover routed ASNs only, as on the country pages. Small grey figures are shares: of routes for invalid routes, of routed ASNs otherwise, and per 100 routed ASNs for high findings.</p>
+    <div class="nr-tbox short">
+      <table class="nr-rankt">
+        <thead><tr id="rank-head"></tr></thead>
+        <tbody id="rank-body"><tr><td class="nr-empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="nr-card nr-full" aria-labelledby="h-full">
+    <h2 id="h-full">Networks with full ROA coverage and ASPA</h2>
+    <p class="note">Routed networks where every announcement is RPKI-valid <i>and</i> the AS publishes an ASPA. These are fully protected by both route-origin validation and, where ASPA is enforced, path validation. Largest IPv4 space first; click a column to sort. Remaining findings are listed so you can see who still has loose ends, such as wide maxLength or a provider missing from the ASPA.</p>
+    <div class="nr-filters">
+      <div class="nr-countchips" id="full-chips" role="group" aria-label="Country"></div>
+      <label>Search<input class="nr-search" id="full-search" type="search" placeholder="ASN or name"></label>
+      <label class="nr-check"><input type="checkbox" id="full-clean"> Only networks with no findings</label>
+    </div>
+    <p class="nr-count" id="full-count"></p>
+    <div class="nr-tbox">
+      <table>
+        <thead><tr id="full-head"></tr></thead>
+        <tbody id="full-body"><tr><td class="nr-empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="nr-foot">
+    Built from the four country dashboards, which are updated daily from the <a href="https://console.rpki-client.org/">rpki-client console</a> (validated ROAs and ASPAs, all RIRs),
+    <a href="https://stat.ripe.net/">RIPEstat</a> / RIPE RIS (announcements, neighbours) and <a href="https://github.com/ipverse/asn-info">ipverse asn-info</a>.
+    How each figure is computed: see “Method &amp; caveats” on any country page.
+    Source code: <a href="https://github.com/thorsheim/norway-rpki">github.com/thorsheim/norway-rpki</a>.
+  </footer>
+</div>
+</div>
+
+<script>
+(function () {
+  const COUNTRIES = {{COUNTRIES_JSON}};
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n == null ? '—' : Number(n).toLocaleString('en-GB');
+  const pct = (n, d = 1) => n == null || isNaN(n) ? '—' : n.toFixed(d) + '%';
+  const el = (tag, attrs = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (v != null) e.setAttribute(k, v); }
+    kids.flat().forEach(k => k != null && e.append(k));
+    return e;
+  };
+  const toDate = (t) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(t)) ? t : t + 'Z');
+  const when = (t, tz) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(toDate(t)).replace(/,/g, '');
+  const getJSON = (url) => fetch(url, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  const flagCell = (c) => el('span', { class: 'nr-cc' }, el('img', { src: c.flag, alt: '' }), el('a', { href: c.path, text: c.name }));
+  const cov = (v, color) => el('div', { class: 'nr-cov' }, el('div', { class: 'bar' }, (() => { const i = el('i'); i.style.width = Math.max(0, Math.min(100, v || 0)) + '%'; i.style.background = color; return i; })()), el('span', { text: pct(v) }));
+
+  Promise.allSettled(COUNTRIES.map(c => Promise.all([getJSON(c.data + 'meta.json'), getJSON(c.data + c.cc.toLowerCase() + '_asns_rpki.json')])))
+    .then(results => {
+      const data = COUNTRIES.map((c, i) => {
+        const r = results[i];
+        if (r.status !== 'fulfilled') return { c, missing: true };
+        const [meta, asns] = r.value; const h = meta.headline || {};
+        const routed = asns.filter(a => a.routed === 'yes');
+        const full = routed.filter(a => a.roa_status === 'All valid' && a.aspa === 'yes');
+        const ann = (h.valid || 0) + (h.invalid || 0) + (h.notfound || 0);
+        return {
+          c, meta, full,
+          routed: h.routed, registered: h.registered,
+          all_valid_pct: h.routed ? 100 * h.all_valid / h.routed : null,
+          none_valid: h.none_valid,
+          v4: h.v4_valid_pct, v6: h.v6_valid_pct,
+          invalid: h.invalid, invalid_pct: ann ? 100 * h.invalid / ann : null,
+          aspa: h.aspa_routed, aspa_pct: h.routed ? 100 * h.aspa_routed / h.routed : null,
+          full_n: full.length, full_pct: h.routed ? 100 * full.length / h.routed : null,
+          high: h.high_routed != null ? h.high_routed : h.high, high_rate: h.routed ? 100 * (h.high_routed != null ? h.high_routed : h.high) / h.routed : null,
+          generated: meta.generated
+        };
+      });
+      renderMeta(data); renderRank(data); renderFull(data);
+    });
+
+  function renderMeta(data) {
+    const ok = data.filter(d => !d.missing);
+    const parts = ok.map(d => `${d.c.name} ${when(d.generated, d.c.tz)}`);
+    $('meta-line').textContent = '';
+    $('meta-line').append(el('b', { text: 'Updated daily with the country dashboards.' }), ` Last updates (local time): ${parts.join(' · ')}.`);
+    const miss = data.filter(d => d.missing).map(d => d.c.name);
+    if (miss.length) $('meta-line').append(el('span', { style: 'color:var(--color-warn)', text: ` No data yet for ${miss.join(', ')}.` }));
+    const routed = ok.reduce((s, d) => s + (d.routed || 0), 0), full = ok.reduce((s, d) => s + d.full_n, 0);
+    const best = [...ok].sort((a, b) => b.all_valid_pct - a.all_valid_pct)[0];
+    $('takeaway').textContent = '';
+    if (best) $('takeaway').append(`Across ${ok.length} countries, `, el('b', { text: fmt(routed) }), ' ASNs are routed. ',
+      el('b', { text: best.c.name }), ` leads, with ${pct(best.all_valid_pct)} of its routed networks fully RPKI-valid. `,
+      el('b', { text: fmt(full) }), ` networks (${pct(100 * full / Math.max(1, routed))}) have both full ROA coverage and an ASPA.`);
+  }
+
+  // ---------- ranking table ----------
+  const RANK_COLS = [
+    { key: 'all_valid_pct', label: 'All routes valid', best: 'high', tie: 'v4', cell: d => [cov(d.all_valid_pct, 'var(--color-ok)'), el('span', { class: 'sub', text: `${fmt(Math.round(d.all_valid_pct * d.routed / 100))} of ${fmt(d.routed)} ASNs` })] },
+    { key: 'v4', label: 'IPv4 space valid', best: 'high', cell: d => cov(d.v4, '#3b7dd8') },
+    { key: 'v6', label: 'IPv6 space valid', best: 'high', cell: d => cov(d.v6, '#8a63d2') },
+    { key: 'invalid_pct', label: 'Invalid routes', best: 'low', num: true, cell: d => [fmt(d.invalid), el('span', { class: 'sub', text: pct(d.invalid_pct, 2) })] },
+    { key: 'none_valid', label: 'No valid route', best: 'low', num: true, sortVal: d => d.routed ? d.none_valid / d.routed : null, cell: d => [fmt(d.none_valid), el('span', { class: 'sub', text: pct(100 * d.none_valid / Math.max(1, d.routed)) })] },
+    { key: 'aspa_pct', label: 'ASPA published', best: 'high', cell: d => [cov(d.aspa_pct, '#d99a2b'), el('span', { class: 'sub', text: `${fmt(d.aspa)} ASNs` })] },
+    { key: 'full_pct', label: 'ROA + ASPA', best: 'high', num: true, cell: d => [fmt(d.full_n), el('span', { class: 'sub', text: pct(d.full_pct) })] },
+    { key: 'high_rate', label: 'High findings', best: 'low', num: true, cell: d => [fmt(d.high), el('span', { class: 'sub', text: (d.high_rate == null ? '—' : d.high_rate.toFixed(1)) + ' per 100' })] },
+  ];
+  let rankKey = 'all_valid_pct';
+  function renderRank(data) {
+    const head = $('rank-head'); head.textContent = '';
+    head.append(el('th', { class: 'rank-col', scope: 'col' }, el('button', { type: 'button', disabled: '', text: '#' })),
+      el('th', { scope: 'col' }, el('button', { type: 'button', disabled: '', text: 'Country' })));
+    RANK_COLS.forEach(col => {
+      const th = el('th', { scope: 'col', class: col.num ? 'num' : null, 'aria-sort': col.key === rankKey ? 'descending' : null });
+      const b = el('button', { type: 'button', text: col.label, title: col.best === 'high' ? 'Higher is better' : 'Lower is better' });
+      b.addEventListener('click', () => { rankKey = col.key; renderRank(data); });
+      th.append(b); head.append(th);
+    });
+    const col = RANK_COLS.find(c => c.key === rankKey);
+    const val = (d) => col.sortVal ? col.sortVal(d) : d[col.key];
+    const ok = data.filter(d => !d.missing), miss = data.filter(d => d.missing);
+    ok.sort((a, b) => {
+      const x = val(a), y = val(b);
+      const diff = col.best === 'high' ? y - x : x - y;
+      if (Math.abs(diff) > 1e-9) return diff;
+      return (b.v4 || 0) - (a.v4 || 0);
+    });
+    const body = $('rank-body'); body.textContent = '';
+    ok.forEach((d, i) => {
+      const tr = el('tr', {}, el('td', { class: 'rank-col' }, el('span', { class: 'nr-rank' + (i === 0 ? ' r1' : ''), text: String(i + 1) })),
+        el('td', {}, flagCell(d.c), el('span', { class: 'sub', text: `${fmt(d.routed)} routed · ${fmt(d.registered)} registered` })));
+      RANK_COLS.forEach(c => tr.append(el('td', { class: c.num ? 'num' : null }, c.cell(d))));
+      body.append(tr);
+    });
+    miss.forEach(d => body.append(el('tr', {}, el('td', { class: 'rank-col', text: '–' }), el('td', {}, flagCell(d.c)),
+      el('td', { colspan: RANK_COLS.length, class: 'nr-empty', text: 'No data yet: the first update has not finished.' }))));
+  }
+
+  // ---------- networks with full ROA coverage + ASPA ----------
+  const FULL_COLS = [
+    { key: 'cc', label: 'Country', val: r => r.c.name },
+    { key: 'asn', label: 'ASN', num: true, val: r => r.a.asn },
+    { key: 'name', label: 'Network', val: r => (r.a.name || '').toLowerCase() },
+    { key: 'ann', label: 'Routes (v4 / v6)', num: true, val: r => r.a.prefixes_v4 + r.a.prefixes_v6 },
+    { key: 'v4', label: 'IPv4 /24s', num: true, val: r => r.a.v4_24s || 0 },
+    { key: 'provs', label: 'ASPA providers', val: r => (r.a.aspa_providers || '').split(', ').filter(Boolean).length },
+    { key: 'find', label: 'Remaining findings', num: true, val: r => (r.a.high || 0) * 1e6 + (r.a.medium || 0) * 1e3 + (r.a.low || 0) },
+  ];
+  let fullSort = { key: 'v4', dir: -1 }, fullCc = new Set(), all = [];
+  function renderFull(data) {
+    all = data.filter(d => !d.missing).flatMap(d => d.full.map(a => ({ c: d.c, a })));
+    const chips = $('full-chips'); chips.textContent = '';
+    data.filter(d => !d.missing).forEach(d => {
+      const b = el('button', { type: 'button', class: 'nr-chip', 'aria-pressed': 'false' }, el('img', { src: d.c.flag, alt: '' }), `${d.c.name} ${d.full_n}`);
+      b.addEventListener('click', () => { fullCc.has(d.c.cc) ? fullCc.delete(d.c.cc) : fullCc.add(d.c.cc); b.setAttribute('aria-pressed', String(fullCc.has(d.c.cc))); drawFull(); });
+      chips.append(b);
+    });
+    $('full-search').addEventListener('input', drawFull);
+    $('full-clean').addEventListener('change', drawFull);
+    drawFull();
+  }
+  function drawFull() {
+    const head = $('full-head'); head.textContent = '';
+    FULL_COLS.forEach(col => {
+      const th = el('th', { scope: 'col', class: col.num ? 'num' : null, 'aria-sort': col.key === fullSort.key ? (fullSort.dir < 0 ? 'descending' : 'ascending') : null });
+      const b = el('button', { type: 'button', text: col.label });
+      b.addEventListener('click', () => { fullSort = { key: col.key, dir: fullSort.key === col.key ? -fullSort.dir : (col.num || col.key === 'provs' ? -1 : 1) }; drawFull(); });
+      th.append(b); head.append(th);
+    });
+    const q = $('full-search').value.trim().toLowerCase().replace(/^as(?=\d)/, '');
+    const clean = $('full-clean').checked;
+    const col = FULL_COLS.find(c => c.key === fullSort.key);
+    const rows = all.filter(r => (!fullCc.size || fullCc.has(r.c.cc))
+        && (!q || String(r.a.asn).startsWith(q) || (r.a.name || '').toLowerCase().includes(q))
+        && (!clean || !((r.a.high || 0) + (r.a.medium || 0) + (r.a.low || 0))))
+      .sort((x, y) => { const a = col.val(x), b = col.val(y); return (a < b ? -1 : a > b ? 1 : 0) * fullSort.dir || (y.a.v4_24s || 0) - (x.a.v4_24s || 0); });
+    $('full-count').textContent = `${fmt(rows.length)} of ${fmt(all.length)} networks`;
+    const body = $('full-body'); body.textContent = '';
+    if (!rows.length) { body.append(el('tr', {}, el('td', { colspan: FULL_COLS.length, class: 'nr-empty', text: all.length ? 'No networks match these filters.' : 'No networks yet.' }))); return; }
+    rows.forEach(({ c, a }) => {
+      const provs = (a.aspa_providers || '').split(', ').filter(Boolean);
+      const f = [['high', 'High'], ['medium', 'Medium'], ['low', 'Low']].filter(([k]) => a[k]).map(([k, l]) => `${a[k]} ${l.toLowerCase()}`);
+      body.append(el('tr', {},
+        el('td', {}, flagCell(c)),
+        el('td', { class: 'num' }, el('a', { href: `https://bgp.tools/as/${a.asn}`, target: '_blank', rel: 'noopener', text: 'AS' + a.asn })),
+        el('td', { class: 'wrap', text: a.name || '' }),
+        el('td', { class: 'num', text: `${fmt(a.prefixes_v4)} / ${fmt(a.prefixes_v6)}` }),
+        el('td', { class: 'num', text: fmt(a.v4_24s) }),
+        el('td', { class: 'wrap nr-provs', title: provs.join(', '), text: provs.length ? (provs.length > 4 ? provs.slice(0, 4).join(', ') + ` +${provs.length - 4}` : provs.join(', ')) : '—' }),
+        el('td', { class: 'num' + (f.length ? '' : ' nr-ok'), text: f.length ? f.join(', ') : 'none' })));
+    });
+  }
+})();
+</script>
+</body>
+</html>

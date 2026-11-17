@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Write one dashboard page per country from site/template.html.
+"""Write the dashboard pages from the templates in site/.
 
-Norway stays at the site root (docs/index.html, data in docs/data); the others live in
-docs/<cc>/index.html with their data in docs/<cc>/data. Run after editing the template.
+* site/template.html -> one page per country. Norway stays at the site root (docs/index.html,
+  data in docs/data); the others live in docs/<cc>/index.html with data in docs/<cc>/data.
+* site/nordic.html   -> docs/nordic/index.html, the four countries side by side. It reads the
+  country data files in the browser and shares the country pages' styles.
+Run after editing either template.
 """
+import json
 import os
 import urllib.parse
 
@@ -34,10 +38,18 @@ COUNTRIES = [  # order of the switcher
 ]
 
 
+NORDIC_ICON = "data:image/svg+xml," + urllib.parse.quote(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+    "<rect width='15' height='15' rx='4' fill='#ba0c2f'/><rect x='17' width='15' height='15' rx='4' fill='#006aa7'/>"
+    "<rect y='17' width='15' height='15' rx='4' fill='#002f6c'/><rect x='17' y='17' width='15' height='15' rx='4' fill='#c8102e'/></svg>",
+    safe="/:=' ")
+
+
 def switcher(cur):
-    links = "".join(
+    links = (f'<a href="/nordic/"{" aria-current=\"page\"" if cur == "nordic" else ""}><img src="{NORDIC_ICON}" alt="">Nordic overview</a>'
+             + "".join(
         f'<a href="{c["path"]}"{" aria-current=\"page\"" if c is cur else ""}><img src="{c["flag"]}" alt="">{c["name"]}</a>'
-        for c in COUNTRIES)
+        for c in COUNTRIES))
     return f'    <nav class="nr-countries" aria-label="Country">{links}</nav>'
 
 
@@ -53,6 +65,18 @@ def main():
         os.makedirs(os.path.join(out, "data"), exist_ok=True)
         open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(page)
         print("wrote", os.path.relpath(os.path.join(out, "index.html"), ROOT))
+
+    css = tpl[tpl.index("<style>") + 7:tpl.index("</style>")].strip("\n")
+    nordic = open(os.path.join(ROOT, "site", "nordic.html"), encoding="utf-8").read()
+    cj = [{"cc": c["cc"], "name": c["name"], "tz": c["tz"], "path": c["path"], "flag": c["flag"],
+           "data": "../" + (c["dir"][len("docs/"):] + "/" if c["dir"] != "docs" else "") + "data/"} for c in COUNTRIES]
+    for k, v in {"{{CSS}}": css, "{{SWITCHER}}": switcher("nordic"), "{{ICON}}": NORDIC_ICON,
+                 "{{COUNTRIES_JSON}}": json.dumps(cj, ensure_ascii=False)}.items():
+        nordic = nordic.replace(k, v)
+    assert "{{" not in nordic, "nordic placeholders left"
+    os.makedirs(os.path.join(ROOT, "docs", "nordic"), exist_ok=True)
+    open(os.path.join(ROOT, "docs", "nordic", "index.html"), "w", encoding="utf-8").write(nordic)
+    print("wrote docs/nordic/index.html")
 
 
 if __name__ == "__main__":

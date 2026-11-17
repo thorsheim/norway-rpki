@@ -11,6 +11,11 @@ leftover ROAs) and ASPA records compared with observed upstreams.
 | Finland | https://rpki.thorsheim.net/fi/ | `docs/fi/data/` |
 | Denmark | https://rpki.thorsheim.net/dk/ | `docs/dk/data/` |
 
+**Nordic overview:** https://rpki.thorsheim.net/nordic/ ranks the four countries side by side
+(sortable by each measure) and lists every routed network with full ROA coverage (all
+announcements RPKI-valid) and an ASPA. It reads the country data files in the browser, so it
+is always in step with the country dashboards.
+
 Rebuilt daily by a GitHub Action (`.github/workflows/update.yml`). Each country is built
 separately, so one country failing does not hold back the others; a later run the same day
 retries only the countries that did not update.
@@ -35,6 +40,7 @@ Every announcement is validated per RFC 6811 against every VRP worldwide.
 - `site/template.html` is the dashboard page; `scripts/make_pages.py` writes one copy per
   country (`docs/index.html` for Norway, `docs/<cc>/index.html` for the others) with the
   country's name, time zone, flag and the country switcher. Edit the template, not the copies.
+- `site/nordic.html` is the Nordic overview; `make_pages.py` writes it to `docs/nordic/index.html`.
 - `scripts/daily_gate.py` decides which countries a run should build.
 - In each data folder: `history.json` keeps one row of headline figures per day,
   `changes_log.json` every run's changes for the last 30 days, `state.json` the per-ASN
