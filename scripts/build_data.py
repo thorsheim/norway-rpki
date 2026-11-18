@@ -446,7 +446,7 @@ def analyze(raw, prev_rows):
 STATUS_RANK = {"None valid": 0, "Partly valid": 1, "All valid": 2}
 ROV_RANK = {"I": 0, "N": 1, "V": 2}
 ROV_NAME = {"V": "Valid", "N": "NotFound", "I": "Invalid"}
-DELTA_FIELDS = ["prefixes_v4", "prefixes_v6", "valid", "notfound", "invalid", "valid_pct", "cov_v4_pct", "v4_24s",
+DELTA_FIELDS = ["prefixes_v4", "prefixes_v6", "valid", "notfound", "invalid", "valid_pct", "cov_v4_pct", "v4_24s", "v6_48s",
                 "vrps", "wide_maxlen_v4", "loose_maxlen_v4", "unannounced_vrps", "high", "medium", "low"]
 
 

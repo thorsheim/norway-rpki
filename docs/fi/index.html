@@ -298,7 +298,7 @@ window.dash = (function () {
 
     <div class="nr-card nr-full" id="top-card">
       <h2>Finnish networks by size</h2>
-      <p class="note">Every routed Finnish ASN, largest announced IPv4 space (counted in /24s) first. Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid. Click a column to sort.</p>
+      <p class="note">Every routed Finnish ASN, largest announced IPv4 space (counted in /24s) first; IPv6 space is counted in /48s. Bars show the share of IPv4 space and of all announcements that validate as RPKI-valid. Click a column to sort.</p>
       <div class="nr-filters" id="top-filters">
         <label>Search<input class="nr-search" id="top-search" type="search" placeholder="ASN or name…"></label>
         <label>Route validity
@@ -335,6 +335,7 @@ window.dash = (function () {
         <label>Sort by
           <select class="nr-select" id="top-sort">
             <option value="size">IPv4 space</option>
+            <option value="size6">IPv6 space</option>
             <option value="cov">IPv4 space valid</option>
             <option value="valid">Routes valid</option>
             <option value="invalid">Invalid routes</option>
@@ -356,6 +357,7 @@ window.dash = (function () {
             <th data-field="asn"><button>ASN</button></th>
             <th data-field="name"><button>Network</button></th>
             <th data-field="v4_24s" class="num"><button>IPv4 /24s</button></th>
+            <th data-field="v6_48s" class="num"><button>IPv6 /48s</button></th>
             <th data-field="roa_status"><button>ROA status</button></th>
             <th data-field="cov_v4_pct"><button>IPv4 space valid</button></th>
             <th data-field="valid_pct"><button>Routes valid</button></th>
@@ -780,7 +782,7 @@ window.dash = (function () {
   const chgCell = (td, x) => changesBadge(td, x, x.changes, x.changes_more);
 
   // ---------- filters and sort for the networks-by-size table
-  const TOP_SORTS = { size: ['v4_24s', 'desc'], cov: ['cov_v4_pct', 'asc'], valid: ['valid_pct', 'asc'], invalid: ['invalid', 'desc'],
+  const TOP_SORTS = { size: ['v4_24s', 'desc'], size6: ['v6_48s', 'desc'], cov: ['cov_v4_pct', 'asc'], valid: ['valid_pct', 'asc'], invalid: ['invalid', 'desc'],
     notfound: ['notfound', 'desc'], high: ['high', 'desc'], wide: ['wide_maxlen_v4', 'desc'], changes: ['chg_total', 'desc'],
     name: ['name', 'asc'], asn: ['asn', 'asc'] };
   const topF = { status: '', issue: '', aspa: '', size: 0, changed: false };
@@ -1025,7 +1027,7 @@ window.dash = (function () {
   const sevCell = (td, x) => { const s = document.createElement('span'); s.className = 'nr-sev ' + x.severity; s.textContent = x.severity; td.appendChild(s); };
   const numCell = (f) => (td, x) => { td.textContent = x[f] == null ? '' : fmt(x[f]); };
 
-  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'cov_v4_pct', 'valid_pct', 'invalid', 'notfound', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
+  setupTable('top-table', { sortKey: 'v4_24s', search: 'top-search', numeric: ['v4_24s', 'v6_48s', 'cov_v4_pct', 'valid_pct', 'invalid', 'notfound', 'wide_maxlen_v4', 'high', 'asn', 'chg_total'] });
   setupTopFilters();
   setupTable('chg-table', { sortKey: 'date', sortDir: 'desc', search: 'chg-search', numeric: ['asn'] });
   document.getElementById('chg-day').addEventListener('change', e => { chgDay = e.target.value; render(); });
@@ -1434,7 +1436,8 @@ window.dash = (function () {
     const s = state('asns'); const t = document.getElementById('top-table');
     if (s.status !== 'ok') { clear(t.querySelector('tbody')); return; }
     drawTable('top-table', s.data.filter(r => r.routed === 'yes'), [
-      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numD('v4_24s', 0, 'announced IPv4 /24s', ['route']) }, { f: 'roa_status', render: statusCell },
+      { f: 'asn', render: asCell('asn') }, { f: 'name' }, { f: 'v4_24s', cls: 'num', render: numD('v4_24s', 0, 'announced IPv4 /24s', ['route']) },
+      { f: 'v6_48s', cls: 'num', render: numD('v6_48s', 0, 'announced IPv6 /48s', ['route']) }, { f: 'roa_status', render: statusCell },
       { f: 'cov_v4_pct', render: covD('cov_v4_pct', 1, 'IPv4 space valid', ['route', 'status']) }, { f: 'valid_pct', render: covD('valid_pct', 1, 'routes valid', ['route', 'status']) },
       { f: 'invalid', cls: 'num', render: (td, x) => { numD('invalid', -1, 'invalid routes', ['route', 'finding'])(td, x); if (x.invalid) td.style.color = 'var(--color-bad)'; } },
       { f: 'notfound', cls: 'num', render: numD('notfound', -1, 'routes without ROA', ['route']) },
