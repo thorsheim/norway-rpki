@@ -571,6 +571,14 @@ window.dash = (function () {
         <li><b>Changes:</b> every update is compared with the previous one. Badges show the difference (+/−; ▲/▼ for route validity), coloured green when things improved and red when they got worse; hover, tap or focus a badge to see exactly what changed. The Changes tab keeps a log of every change for the last 30 days, with a chart per day.</li>
         <li><b>ASPA:</b> each provider set is compared with the neighbours RIS sees on the upstream side. RIS cannot tell peers from transit providers, so unlisted neighbours are something to check, not proven errors.</li>
       </ul>
+      <h3>Data volume and requests</h3>
+      <ul>
+        <li><b>Per daily update:</b> one RIPEstat request per registered ASN (announced prefixes) and one per routed ASN (neighbours), plus the country list; at most six at a time, each tagged with a <i>sourceapp</i> and a User-Agent naming this dashboard.</li>
+        <li><b>Shared downloads:</b> the worldwide ROA/ASPA dataset (<i>rpki.json</i>) and the ipverse ASN list are downloaded once per daily run, compressed where the server supports it, and shared by all countries.</li>
+        <li><b>Publication points:</b> an ASN's rpki-client console page is fetched only when its ROAs or ASPA changed, plus once every 14 days per ASN (staggered); otherwise the previous result is reused.</li>
+        <li><b>Visitors</b> never reach the data sources: the site is static files on GitHub Pages.</li>
+        <li id="traffic-line" hidden></li>
+      </ul>
       <h3>What this does not show</h3>
       <ul>
         <li>Routes seen by fewer than 10 RIS peers, or only inside Denmark.</li>
@@ -585,6 +593,7 @@ window.dash = (function () {
     <a href="https://stat.ripe.net/">RIPEstat</a> / RIPE RIS (announcements, neighbours) ·
     <a href="https://github.com/ipverse/asn-info">ipverse asn-info</a>.
     Source code: <a href="https://github.com/thorsheim/norway-rpki">github.com/thorsheim/norway-rpki</a>. Raw data: <a href="data/dk_asns_rpki.json">ASNs</a>, <a href="data/dk_findings.json">findings</a>, <a href="data/dk_vrps.json">VRPs</a>, <a href="data/dk_aspa.json">ASPA</a>, <a href="data/history.json">history</a>.
+    <span id="version-line"></span>
   </footer>
 </div>
 
@@ -1488,7 +1497,7 @@ window.dash = (function () {
   }
 
   function render() {
-    renderScope(); renderKpi(); renderAspaSub(); renderMeta(); renderKpiDeltas();
+    renderScope(); renderKpi(); renderAspaSub(); renderMeta(); renderKpiDeltas(); renderTraffic();
     const cur = (document.querySelector('.nr-tab[aria-selected="true"]') || {}).dataset?.tab || 'overview';
     if (cur === 'overview') {
       renderTrend();
@@ -1535,6 +1544,26 @@ window.dash = (function () {
     let off = 0;
     series.forEach(([k, label], i) => { const g = lg.append('g').attr('transform', `translate(${off},0)`); g.append('rect').attr('width', 10).attr('height', 10).attr('y', -8).attr('rx', 3).attr('fill', dash.colors[i]); const t = g.append('text').attr('x', 15).attr('fill', 'var(--color-fg)').text(`${label} ${d3.format('.1f')(rows[rows.length - 1][k])}%`); off += 15 + t.node().getComputedTextLength() + 16; });
   }
+  // ---------- Method: measured requests and bytes of the last update
+  let runSummary = null;
+  fetch('/run.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { runSummary = j; renderTraffic(); }).catch(() => {});
+  const HOSTS = { 'stat.ripe.net': 'RIPEstat', 'console.rpki-client.org': 'rpki-client console', 'raw.githubusercontent.com': 'ipverse (GitHub)' };
+  const mb = (b) => b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' kB';
+  const hostList = (hosts) => Object.entries(hosts || {}).sort((a, b) => b[1].requests - a[1].requests)
+    .map(([h, v]) => `${HOSTS[h] || String(h).replace(/[^a-z0-9.-]/gi, '')} ${fmtN(v.requests)} request${v.requests === 1 ? '' : 's'} (${mb(v.bytes)})`).join(', ');
+  function renderTraffic() {
+    const el = document.getElementById('traffic-line'); if (!el) return;
+    const s = state('meta'); const t = s.status === 'ok' ? s.data.traffic : null;
+    const parts = [];
+    if (runSummary && runSummary.requests) {
+      const n = Object.keys(runSummary.countries || {}).length;
+      parts.push(`<b>Measured, last daily update${runSummary.complete ? ' of all ' + n + ' countries' : ' (' + n + (n === 1 ? ' country)' : ' countries)')}:</b> ${fmtN(runSummary.requests)} requests and ${mb(runSummary.bytes)} transferred in about ${Math.max(1, Math.round((runSummary.seconds || 0) / 60))} minutes: ${hostList(runSummary.hosts)}.`);
+    }
+    if (t && t.requests) parts.push(`<b>This country:</b> ${fmtN(t.requests)} requests, ${mb(t.bytes)}${s.data.pub_pages ? `; ${fmtN(s.data.pub_pages.fetched)} console pages fetched, ${fmtN(s.data.pub_pages.reused)} reused` : ''}.`);
+    el.hidden = !parts.length;
+    el.innerHTML = parts.join(' ');  // built only from numbers and the fixed HOSTS names above
+  }
+
   function renderMeta() {
     const s = state('meta'); const el = document.getElementById('meta-line');
     if (s.status !== 'ok') return;
@@ -1559,5 +1588,21 @@ window.dash = (function () {
 </script>
 
 </div>
+
+<script>
+/* footer: dashboard version from /version.json (written at deploy time) */
+(function () {
+  const el = document.getElementById('version-line'); if (!el) return;
+  fetch('/version.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(v => {
+    if (!v || !/^[0-9a-f]{40}$/.test(v.commit || '')) return;
+    const d = new Date(v.date);
+    const a = document.createElement('a');
+    a.href = 'https://github.com/thorsheim/norway-rpki/commit/' + v.commit; a.textContent = v.short;
+    a.title = String(v.subject || '');
+    el.append(` Dashboard version ${Number(v.version) || '?'} (`, a,
+      `, ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
+  }).catch(() => {});
+})();
+</script>
 </body>
 </html>

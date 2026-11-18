@@ -75,6 +75,7 @@
     <a href="https://stat.ripe.net/">RIPEstat</a> / RIPE RIS (announcements, neighbours) and <a href="https://github.com/ipverse/asn-info">ipverse asn-info</a>.
     How each figure is computed: see “Method &amp; caveats” on any country page.
     Source code: <a href="https://github.com/thorsheim/norway-rpki">github.com/thorsheim/norway-rpki</a>.
+    <span id="version-line"></span>
   </footer>
 </div>
 </div>
@@ -233,6 +234,22 @@
         el('td', { class: 'num' + (f.length ? '' : ' nr-ok'), text: f.length ? f.join(', ') : 'none' })));
     });
   }
+})();
+</script>
+
+<script>
+/* footer: dashboard version from /version.json (written at deploy time) */
+(function () {
+  const el = document.getElementById('version-line'); if (!el) return;
+  fetch('/version.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(v => {
+    if (!v || !/^[0-9a-f]{40}$/.test(v.commit || '')) return;
+    const d = new Date(v.date);
+    const a = document.createElement('a');
+    a.href = 'https://github.com/thorsheim/norway-rpki/commit/' + v.commit; a.textContent = v.short;
+    a.title = String(v.subject || '');
+    el.append(` Dashboard version ${Number(v.version) || '?'} (`, a,
+      `, ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
+  }).catch(() => {});
 })();
 </script>
 </body>

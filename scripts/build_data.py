@@ -20,14 +20,18 @@ import argparse
 import collections
 import csv
 import datetime as dt
+import gzip
+import hashlib
 import io
 import ipaddress as ip
 import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -37,6 +41,7 @@ RIPESTAT = "https://stat.ripe.net/data"
 CONSOLE = "https://console.rpki-client.org"
 IPVERSE_ASINFO = "https://raw.githubusercontent.com/ipverse/asn-info/master/as.csv"
 MIN_PEERS = 10
+PUB_REFRESH_DAYS = 14
 
 COUNTRIES = {
     "NO": {"name": "Norway", "adj": "Norwegian", "tz": "Europe/Oslo"},
@@ -54,13 +59,35 @@ def log(*a):
     print(time.strftime("%H:%M:%S"), *a, file=sys.stderr, flush=True)
 
 
+# Traffic counter: requests and bytes per host for this run (bytes as transferred, i.e. compressed
+# when the server compresses; failed attempts count as requests).
+TRAFFIC = {}
+_TLOCK = threading.Lock()
+
+
+def _count(url, nbytes):
+    host = urllib.parse.urlsplit(url).hostname
+    with _TLOCK:
+        t = TRAFFIC.setdefault(host, {"requests": 0, "bytes": 0})
+        t["requests"] += 1
+        t["bytes"] += nbytes
+
+
 def get(url, tries=5, timeout=300, as_json=True):
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Encoding": "identity"})
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                body = r.read()
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Encoding": "gzip"})
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    body = r.read()
+                    enc = (r.headers.get("Content-Encoding") or "").lower()
+            except Exception:
+                _count(url, 0)
+                raise
+            _count(url, len(body))
+            if enc == "gzip":
+                body = gzip.decompress(body)
             return json.loads(body) if as_json else body.decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             last = e
@@ -111,7 +138,7 @@ def rov(idx, prefix, origin):
 MAX_REUSE = 0.10  # give up if RIPEstat fails for more than 10% of the networks
 
 
-def collect(prev_rows=(), prev_state=None, rpki_file=None):
+def collect(prev_rows=(), prev_state=None, rpki_file=None, asinfo_file=None):
     now = dt.datetime.now(dt.timezone.utc)
     prev_asns = (prev_state or {}).get("asns", {})
     prev_up = {str(r["asn"]): r.get("upstreams_seen", "") for r in prev_rows}
@@ -126,7 +153,12 @@ def collect(prev_rows=(), prev_state=None, rpki_file=None):
     log("rpki.json:", len(rpki["roas"]), "VRPs,", len(rpki.get("aspas", [])), "ASPAs, built", rpki["metadata"]["buildtime"])
 
     log("ASN lists")
-    ascsv = get(IPVERSE_ASINFO, as_json=False)
+    if asinfo_file and os.path.exists(asinfo_file):
+        ascsv = open(asinfo_file, encoding="utf-8").read()
+    else:
+        ascsv = get(IPVERSE_ASINFO, as_json=False)
+        if asinfo_file:
+            open(asinfo_file, "w", encoding="utf-8").write(ascsv)
     names, ipverse_no = {}, set()
     for row in csv.DictReader(io.StringIO(ascsv)):
         names[row["asn"]] = row["description"]
@@ -200,12 +232,21 @@ def collect(prev_rows=(), prev_state=None, rpki_file=None):
     if len(reused["neighbours"]) > MAX_REUSE * max(1, len(routed)):
         raise RuntimeError(f"asn-neighbours failed for {len(reused['neighbours'])} of {len(routed)} ASNs")
 
+    def fingerprint(a):
+        """Changes whenever the AS's ROAs or ASPA change (then its publication info is fetched again)."""
+        v = sorted((r["prefix"], r["maxLength"], r.get("ta", "")) for r in vrp_by.get(a, []))
+        x = sorted(sorted(p) for p in aspa_by.get(a, []))
+        return hashlib.sha1(json.dumps([v, x]).encode()).hexdigest()[:16]
+
+    day_no = now.date().toordinal()
+
     def hosts(a):
         """Per object on the console page: [type, publication host, number of prefixes/providers]."""
+        old = prev_asns.get(str(a)) or {}
         try:
             h = get(f"{CONSOLE}/AS{a}.html", as_json=False, tries=3, timeout=60)
         except Exception:
-            return a, []
+            return a, old.get("pubs") or []
         objs = []
         for row in re.findall(r"<tr>(.*?)</tr>", h, flags=re.S):
             m = re.search(r'<a href="/([^/"]+)/[^"]+\.(roa|asa)\.html"', row)
@@ -217,16 +258,28 @@ def collect(prev_rows=(), prev_state=None, rpki_file=None):
             objs.append([m.group(2), m.group(1), n])
         return a, objs
 
-    log("publication hosts")
+    # Publication info from the console's per-AS pages. It only changes when the AS's ROAs/ASPA change
+    # or its CA moves, so reuse the previous run's result unless the objects changed, plus a staggered
+    # refresh of every AS once every PUB_REFRESH_DAYS days (catches CA moves with unchanged ROAs).
     need = [a for a in universe if a in vrp_by or a in aspa_by]
-    ca = dict(pmap(hosts, need, workers=4))
+    fps = {a: fingerprint(a) for a in need}
+    ca, fetch = {}, []
+    for a in need:
+        old = prev_asns.get(str(a)) or {}
+        if old.get("pubs_fp") == fps[a] and old.get("pubs") is not None and (day_no + a) % PUB_REFRESH_DAYS:
+            ca[a] = old["pubs"]
+        else:
+            fetch.append(a)
+    log(f"publication hosts: fetching {len(fetch)} console pages, reusing {len(ca)}")
+    ca.update(dict(pmap(hosts, fetch, workers=4)))
 
     raw = {"meta": {"rpki_buildtime": rpki["metadata"]["buildtime"],
                     "ris_query": next((qt for p, qt in ann.values() if qt), None),
                     "nb_query": next((qt for nb, qt in nbs.values() if qt), None),
                     "generated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "global_vrps": len(rpki["roas"]), "global_aspas": len(rpki.get("aspas", [])),
-                    "reused": {k: sorted(v) for k, v in reused.items()}},
+                    "reused": {k: sorted(v) for k, v in reused.items()},
+                    "pub_pages": {"fetched": len(fetch), "reused": len(need) - len(fetch)}},
            "names": {str(a): names.get(str(a), "") for a in set(universe) | {p for v in aspa_by.values() for s in v for p in s}},
            "asns": {}}
     for a in universe:
@@ -239,6 +292,7 @@ def collect(prev_rows=(), prev_state=None, rpki_file=None):
             "nb": nbs.get(a, ([], None))[0],
             "ca": sorted({o[1] for o in ca.get(a, [])}),
             "pubs": ca.get(a, []),
+            "pubs_fp": fps.get(a),
         }
     return raw
 
@@ -458,6 +512,8 @@ def make_state(raw, rows, F):
         s["v"] = sorted({f"{p}-{ml}" for p, ml, *_ in d["v"]})
         s["aspa"] = sorted({p for x in d["aspa"] for p in x})
         s["nb"] = d["nb"]
+        if d.get("pubs_fp"):
+            s["pubs"], s["pubs_fp"] = d.get("pubs") or [], d["pubs_fp"]
     for f in F:
         st[f["asn"]]["f"].setdefault(f"{f['severity']}|{f['category']}", []).extend(f["_objs"])
     return {"generated": raw["meta"]["generated"], "rpki_buildtime": raw["meta"]["rpki_buildtime"],
@@ -658,10 +714,12 @@ def headline(rows, F, raw):
 
 
 def main():
+    t0 = time.time()
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--country", default="NO", choices=sorted(COUNTRIES))
     ap.add_argument("--rpki-file", help="cache for rpki.json, shared between countries in one run")
+    ap.add_argument("--asinfo-file", help="cache for the ipverse as.csv, shared between countries in one run")
     ap.add_argument("--from-raw")
     ap.add_argument("--save-raw")
     args = ap.parse_args()
@@ -673,7 +731,7 @@ def main():
     prev_rows = rd(px + "asns_rpki.json", [])
     prev_meta = rd("meta.json", {})
     prev_state = rd("state.json", None)
-    raw = json.load(open(args.from_raw)) if args.from_raw else collect(prev_rows, prev_state, args.rpki_file)
+    raw = json.load(open(args.from_raw)) if args.from_raw else collect(prev_rows, prev_state, args.rpki_file, args.asinfo_file)
     if args.save_raw:
         json.dump(raw, open(args.save_raw, "w"))
     if prev_state is None and prev_rows:
@@ -715,8 +773,14 @@ def main():
                        "prev_rpki_buildtime": (prev_state or {}).get("rpki_buildtime"),
                        "prev_headline": prev_meta.get("headline"),
                        "changes_detail": "partial" if (prev_state or {}).get("partial") else ("full" if prev_state else "none"),
-                       "country": {"code": CC, **C}, "sources": sources()})
+                       "country": {"code": CC, **C}, "sources": sources(),
+                       # what this country's update cost the data sources (shared downloads are counted
+                       # once, in the country that fetched them; the others read the run's cached copy)
+                       "traffic": {"hosts": TRAFFIC, "requests": sum(t["requests"] for t in TRAFFIC.values()),
+                                   "bytes": sum(t["bytes"] for t in TRAFFIC.values()),
+                                   "seconds": round(time.time() - t0)} if not args.from_raw else None})
     log("done:", h)
+    log("traffic:", json.dumps(TRAFFIC))
 
 
 if __name__ == "__main__":
