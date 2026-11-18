@@ -1,7 +1,7 @@
 # RPKI: ROA & ASPA posture, Nordics and Czech Republic
 
 Public dashboards showing RPKI deployment for every ASN in Norway, Sweden, Finland,
-Denmark and the Czech Republic: route-origin validity of every announcement, ROA quality (maxLength exposure,
+Denmark, Iceland and the Czech Republic: route-origin validity of every announcement, ROA quality (maxLength exposure,
 leftover ROAs) and ASPA records compared with observed upstreams.
 
 | Country | Dashboard | Data |
@@ -10,6 +10,7 @@ leftover ROAs) and ASPA records compared with observed upstreams.
 | Sweden | https://rpki.thorsheim.net/se/ | `docs/se/data/` |
 | Finland | https://rpki.thorsheim.net/fi/ | `docs/fi/data/` |
 | Denmark | https://rpki.thorsheim.net/dk/ | `docs/dk/data/` |
+| Iceland | https://rpki.thorsheim.net/is/ | `docs/is/data/` |
 | Czech Republic | https://rpki.thorsheim.net/cz/ | `docs/cz/data/` |
 
 **Country overview:** https://rpki.thorsheim.net/overview/ (formerly /nordic/, which redirects) ranks the countries side by side

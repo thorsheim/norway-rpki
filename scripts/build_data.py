@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the RPKI dashboard datasets for one country (NO, SE, FI, DK or CZ).
+"""Build the RPKI dashboard datasets for one country (NO, SE, FI, DK, IS or CZ).
 
 Collects:
   * every validated ROA and ASPA (rpki-client console, rpki.json, all five RIR trust anchors)
@@ -43,6 +43,7 @@ COUNTRIES = {
     "SE": {"name": "Sweden", "adj": "Swedish", "tz": "Europe/Stockholm"},
     "FI": {"name": "Finland", "adj": "Finnish", "tz": "Europe/Helsinki"},
     "DK": {"name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen"},
+    "IS": {"name": "Iceland", "adj": "Icelandic", "tz": "Atlantic/Reykjavik"},
     "CZ": {"name": "Czech Republic", "in": "the Czech Republic", "adj": "Czech", "tz": "Europe/Prague"},
 }
 CC = "NO"  # set from --country in main()
@@ -683,7 +684,7 @@ def main():
     routed = sum(r["routed"] == "yes" for r in rows)
     prev_routed = sum(r["routed"] == "yes" for r in prev_rows)
     prev_vrps = (prev_meta.get("headline") or {}).get("vrps") or len(rd(px + "vrps.json", []))
-    if routed < max(50, 0.7 * prev_routed) or len(V) < max(100, 0.7 * prev_vrps):
+    if routed < max(10, 0.7 * prev_routed) or len(V) < max(20, 0.7 * prev_vrps):  # low floors so small countries (Iceland) pass
         log(f"sanity check failed (routed={routed} vs {prev_routed}, vrps={len(V)} vs {prev_vrps}); keeping previous data")
         sys.exit(1)
     dump = lambda name, obj: json.dump(obj, open(os.path.join(args.out, name), "w"), separators=(",", ":"), ensure_ascii=False)

@@ -42,6 +42,8 @@ COUNTRIES = [  # order of the switcher
      "flag": flag("#fff", "#002f6c", 8.5, 6, 13, 6, border=True)},
     {"cc": "DK", "name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen", "path": "/dk/", "dir": "docs/dk",
      "flag": flag("#c8102e", "#fff", 9.5, 4, 14, 4)},
+    {"cc": "IS", "name": "Iceland", "adj": "Icelandic", "tz": "Atlantic/Reykjavik", "path": "/is/", "dir": "docs/is",
+     "flag": flag("#02529c", "#fff", 8.5, 6, 13, 6, inner=("#dc1e35", 10, 3, 14.5, 3))},
     {"cc": "CZ", "name": "Czech Republic", "in": "the Czech Republic", "adj": "Czech", "tz": "Europe/Prague", "path": "/cz/",
      "dir": "docs/cz", "flag": flag_cz()},
 ]

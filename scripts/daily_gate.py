@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decide which countries this workflow run should build.
 
-Prints 'countries=NO SE FI DK CZ' (possibly empty) and 'build=true|false' for $GITHUB_OUTPUT,
+Prints 'countries=NO SE FI DK IS CZ' (possibly empty) and 'build=true|false' for $GITHUB_OUTPUT,
 and explains why on stderr.
 Rules:
   * push                       -> nothing (the pages are redeployed with the existing data)
@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 OSLO = ZoneInfo("Europe/Oslo")
 UPDATE_HOUR = 8
-DATA = {"NO": "docs/data", "SE": "docs/se/data", "FI": "docs/fi/data", "DK": "docs/dk/data", "CZ": "docs/cz/data"}
+DATA = {"NO": "docs/data", "SE": "docs/se/data", "FI": "docs/fi/data", "DK": "docs/dk/data", "IS": "docs/is/data", "CZ": "docs/cz/data"}
 
 
 def out(countries, why):
