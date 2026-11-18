@@ -7,7 +7,7 @@ import os
 import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CODE = ["--", ".", ":(exclude)docs/data", ":(exclude)docs/*/data", ":(exclude)docs/run.json", ":(exclude)docs/version.json"]
+CODE = ["--", ".", ":(exclude)docs/data", ":(exclude)docs/*/data/*", ":(exclude)docs/run.json", ":(exclude)docs/version.json"]
 
 
 def git(*args):
