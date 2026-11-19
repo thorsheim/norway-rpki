@@ -6,6 +6,11 @@ name: Daily data update
 # inputs {"scheduled": "true"}. The two cron entries below are the fallback: 06:01 UTC is
 # 08:01 in summer (CEST), 07:01 UTC is 08:01 in winter (CET). The "Decide" step makes sure
 # only one update runs per day, never before 08:00 Norwegian time.
+#
+# Security: every action is pinned to an exact commit (Dependabot proposes updates, see
+# .github/dependabot.yml). The build job, which handles data from outside sources, can only
+# push to this repository; publishing rights (pages, id-token) belong to the deploy job alone,
+# which runs no code of ours.
 on:
   schedule:
     - cron: "1 6 * * *"
@@ -20,10 +25,7 @@ on:
     branches: [main]
     paths-ignore: ["docs/data/**", "docs/*/data/**"]
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: update-and-deploy
@@ -33,15 +35,20 @@ jobs:
   update:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    permissions:
+      contents: write
+    outputs:
+      deploy: ${{ steps.gate.outputs.build == 'true' || github.event_name == 'push' }}
+      failed: ${{ steps.build.outputs.failed }}
     steps:
       # Always work on the newest main, not the commit that triggered the run: otherwise a run
       # started by a code push can redeploy a tree without the data committed in the meantime.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: main
           fetch-depth: 0        # full history (without file contents) for the version number in the footer
           filter: blob:none
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
       - name: Decide whether to build new data
@@ -74,31 +81,44 @@ jobs:
           echo "Updated: ${done:- none}  Failed: ${failed:- none}"
       - name: Commit data
         if: steps.gate.outputs.build == 'true'
+        env:
+          DONE: ${{ steps.build.outputs.done }}
         run: |
           python scripts/make_pages.py
           python scripts/run_summary.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs
-          git diff --cached --quiet || git commit -m "Data update $(TZ=Europe/Oslo date +'%Y-%m-%d %H:%M %Z') (${{ steps.build.outputs.done }})"
+          git diff --cached --quiet || git commit -m "Data update $(TZ=Europe/Oslo date +'%Y-%m-%d %H:%M %Z') ($DONE)"
           git pull --rebase -q && git push
       - name: Version info for the page footers
         if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
         run: python scripts/version_info.py
-      - uses: actions/configure-pages@v6
+      - name: Package the site
         if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
-      - uses: actions/upload-pages-artifact@v5
-        if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:
           path: docs
-      - id: deployment
-        if: steps.gate.outputs.build == 'true' || github.event_name == 'push'
-        uses: actions/deploy-pages@v5
-      - name: Report countries that could not be updated
-        if: steps.build.outputs.failed != ''
-        run: |
-          echo "::error::No new data for: ${{ steps.build.outputs.failed }} (the previous data stays online)"
-          exit 1
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6.0.0
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
+      - name: Report countries that could not be updated
+        if: needs.update.outputs.failed != ''
+        env:
+          FAILED: ${{ needs.update.outputs.failed }}
+        run: |
+          echo "::error::No new data for: $FAILED (the previous data stays online)"
+          exit 1

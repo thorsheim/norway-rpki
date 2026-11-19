@@ -20,7 +20,6 @@ import argparse
 import collections
 import csv
 import datetime as dt
-import gzip
 import hashlib
 import io
 import ipaddress as ip
@@ -30,6 +29,7 @@ import re
 import sys
 import threading
 import time
+import zlib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -73,6 +73,23 @@ def _count(url, nbytes):
         t["bytes"] += nbytes
 
 
+MAX_WIRE = 200 * 1024 * 1024     # largest response accepted as transferred (rpki.json is ~5 MB compressed)
+MAX_BODY = 1024 * 1024 * 1024    # largest response accepted after decompression (rpki.json is ~100 MB)
+
+
+class TooLarge(Exception):
+    pass
+
+
+def _gunzip(data, limit):
+    """gzip.decompress with a ceiling, so a hostile or broken server cannot exhaust memory."""
+    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    out = d.decompress(data, limit + 1)
+    if len(out) > limit or d.unconsumed_tail:
+        raise TooLarge(f"decompressed response larger than {limit} bytes")
+    return out
+
+
 def get(url, tries=5, timeout=300, as_json=True):
     last = None
     for i in range(tries):
@@ -80,20 +97,24 @@ def get(url, tries=5, timeout=300, as_json=True):
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Encoding": "gzip"})
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as r:
-                    body = r.read()
+                    body = r.read(MAX_WIRE + 1)
                     enc = (r.headers.get("Content-Encoding") or "").lower()
+                if len(body) > MAX_WIRE:
+                    raise TooLarge(f"response larger than {MAX_WIRE} bytes")
             except Exception:
                 _count(url, 0)
                 raise
             _count(url, len(body))
             if enc == "gzip":
-                body = gzip.decompress(body)
+                body = _gunzip(body, MAX_BODY)
             return json.loads(body) if as_json else body.decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             last = e
             if e.code == 404:
                 raise
             time.sleep(min(60, 3 * 2 ** i))
+        except TooLarge:  # retrying would only download it again
+            raise
         except Exception as e:  # network hiccup
             last = e
             time.sleep(min(60, 3 * 2 ** i))

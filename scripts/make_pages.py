@@ -7,8 +7,11 @@
   country data files in the browser and shares the country pages' styles.
 Run after editing either template.
 """
+import base64
+import hashlib
 import json
 import os
+import re
 import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +67,18 @@ def switcher(cur):
     return f'    <nav class="nr-countries" aria-label="Country">{links}</nav>'
 
 
+def with_csp(html):
+    """Add a Content-Security-Policy that allows only this site's own files plus the page's own
+    inline scripts (by hash). Nothing else can run, load or be sent anywhere."""
+    hashes = ["'sha256-%s'" % base64.b64encode(hashlib.sha256(m.encode()).digest()).decode()
+              for m in re.findall(r"<script>(.*?)</script>", html, flags=re.S)]
+    csp = ("default-src 'none'; script-src 'self' " + " ".join(hashes) + "; style-src 'self' 'unsafe-inline'; "
+           "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'")
+    meta = f'<meta http-equiv="Content-Security-Policy" content="{csp}">'
+    assert '<meta charset="utf-8">' in html
+    return html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + meta, 1)
+
+
 def main():
     tpl = open(os.path.join(ROOT, "site", "template.html"), encoding="utf-8").read()
     for c in COUNTRIES:
@@ -74,7 +89,7 @@ def main():
         assert "{{" not in page, c["cc"]
         out = os.path.join(ROOT, c["dir"])
         os.makedirs(os.path.join(out, "data"), exist_ok=True)
-        open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(page)
+        open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(with_csp(page))
         print("wrote", os.path.relpath(os.path.join(out, "index.html"), ROOT))
 
     css = tpl[tpl.index("<style>") + 7:tpl.index("</style>")].strip("\n")
@@ -86,15 +101,15 @@ def main():
         nordic = nordic.replace(k, v)
     assert "{{" not in nordic, "nordic placeholders left"
     os.makedirs(os.path.join(ROOT, "docs", "overview"), exist_ok=True)
-    open(os.path.join(ROOT, "docs", "overview", "index.html"), "w", encoding="utf-8").write(nordic)
+    open(os.path.join(ROOT, "docs", "overview", "index.html"), "w", encoding="utf-8").write(with_csp(nordic))
     print("wrote docs/overview/index.html")
     # the overview first lived at /nordic/; keep that address working
     os.makedirs(os.path.join(ROOT, "docs", "nordic"), exist_ok=True)
-    open(os.path.join(ROOT, "docs", "nordic", "index.html"), "w", encoding="utf-8").write(
+    open(os.path.join(ROOT, "docs", "nordic", "index.html"), "w", encoding="utf-8").write(with_csp(
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>RPKI country overview</title>'
         '<link rel="canonical" href="https://rpki.thorsheim.net/overview/"><meta http-equiv="refresh" content="0; url=/overview/">'
         '<script>location.replace("/overview/" + location.hash)</script></head>'
-        '<body><p>The overview has moved to <a href="/overview/">rpki.thorsheim.net/overview/</a>.</p></body></html>\n')
+        '<body><p>The overview has moved to <a href="/overview/">rpki.thorsheim.net/overview/</a>.</p></body></html>\n'))
     print("wrote docs/nordic/index.html (redirect)")
 
 

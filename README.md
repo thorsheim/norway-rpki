@@ -50,5 +50,16 @@ Every announcement is validated per RFC 6811 against every VRP worldwide.
   snapshot the next run compares against, and `<cc>_changes.json` what changed since the
   previous run.
 
+## Security
+
+- The pages only render outside data as text (network names come from public registries and are
+  chosen by whoever registers an AS), and each page carries a Content-Security-Policy that allows
+  only the site's own files and the page's own inline scripts (by hash, added by `make_pages.py`).
+- d3 is served from the site itself (`docs/vendor/`, from the npm package d3@7.9.0), not a CDN.
+- The workflow pins every action to an exact commit (Dependabot proposes updates monthly). The
+  build job can only push to this repository; only the deploy job can publish the site.
+- Downloads are capped (200 MB as transferred, 1 GB decompressed), so a broken or hostile source
+  can at worst fail a run; the previous data then stays online.
+
 Run locally with `python scripts/build_data.py --country SE --out docs/se/data`
 (Python 3.10+, no dependencies), then serve `docs/` with any static web server.

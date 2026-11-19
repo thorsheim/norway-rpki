@@ -1,0 +1,11 @@
+# Keeps the commit-pinned GitHub Actions in .github/workflows up to date: once a month,
+# Dependabot opens a pull request when a newer release exists. Review and merge it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
