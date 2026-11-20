@@ -11,60 +11,60 @@
    }
   },
   "SE": {
-   "generated": "2026-11-19T15:12:42Z",
-   "requests": 1619,
-   "bytes": 942386,
-   "seconds": 140,
+   "generated": "2026-11-20T08:55:33Z",
+   "requests": 1610,
+   "bytes": 935300,
+   "seconds": 228,
    "pub_pages": {
-    "fetched": 46,
-    "reused": 480
+    "fetched": 36,
+    "reused": 490
    }
   },
   "FI": {
-   "generated": "2026-11-19T15:15:02Z",
-   "requests": 685,
-   "bytes": 351874,
-   "seconds": 174,
+   "generated": "2026-11-20T08:59:21Z",
+   "requests": 691,
+   "bytes": 354209,
+   "seconds": 221,
    "pub_pages": {
-    "fetched": 12,
-    "reused": 197
+    "fetched": 17,
+    "reused": 192
    }
   },
   "DK": {
-   "generated": "2026-11-19T15:17:56Z",
-   "requests": 849,
-   "bytes": 444872,
-   "seconds": 95,
+   "generated": "2026-11-20T09:03:02Z",
+   "requests": 852,
+   "bytes": 443898,
+   "seconds": 122,
    "pub_pages": {
-    "fetched": 21,
-    "reused": 261
+    "fetched": 25,
+    "reused": 257
    }
   },
   "IS": {
-   "generated": "2026-11-19T15:19:31Z",
+   "generated": "2026-11-20T09:05:04Z",
    "requests": 169,
-   "bytes": 94947,
-   "seconds": 32,
+   "bytes": 93945,
+   "seconds": 30,
    "pub_pages": {
     "fetched": 6,
-    "reused": 46
+    "reused": 45
    }
   },
   "CZ": {
-   "generated": "2026-11-19T15:20:03Z",
-   "requests": 1374,
-   "bytes": 714600,
-   "seconds": 198,
+   "generated": "2026-11-20T09:05:35Z",
+   "requests": 1368,
+   "bytes": 711214,
+   "seconds": 188,
    "pub_pages": {
-    "fetched": 44,
-    "reused": 499
+    "fetched": 39,
+    "reused": 504
    }
   }
  },
  "hosts": {
   "console.rpki-client.org": {
-   "requests": 150,
-   "bytes": 6071160
+   "requests": 144,
+   "bytes": 6065219
   },
   "raw.githubusercontent.com": {
    "requests": 1,
@@ -72,11 +72,11 @@
   },
   "stat.ripe.net": {
    "requests": 5296,
-   "bytes": 2864778
+   "bytes": 2860606
   }
  },
- "requests": 5447,
- "bytes": 11304324,
- "seconds": 715,
+ "requests": 5441,
+ "bytes": 11294211,
+ "seconds": 865,
  "complete": true
 }
