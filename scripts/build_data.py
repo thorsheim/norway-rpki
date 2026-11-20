@@ -567,11 +567,12 @@ def _norm(o):
 def diff_state(prev, cur):
     """Per-ASN list of change events. k: '+', '-' or '~'; g: 1 better, -1 worse, 0 neutral."""
     out = {}
-    P, C = prev["asns"], cur["asns"]
-    for a in sorted(set(P) | set(C), key=int):
-        p, c, ev = P.get(a), C.get(a), []
+    # (not "C": that name is the country settings, used in the texts below)
+    prev_asns, cur_asns = prev["asns"], cur["asns"]
+    for a in sorted(set(prev_asns) | set(cur_asns), key=int):
+        p, c, ev = prev_asns.get(a), cur_asns.get(a), []
         if p is None:
-            ev.append({"k": "+", "g": 0, "c": "asn", "t": f"Newly counted as a {C['adj']} ASN"})
+            ev.append({"k": "+", "g": 0, "c": "asn", "t": f"Newly added to the list of {C['adj']} ASNs"})
             p = {"st": "Not routed", "ann": {}, "v": [], "aspa": [], "f": {}}
         if c is None:
             out[a] = [{"k": "-", "g": 0, "c": "asn", "t": f"No longer in the list of {C['adj']} ASNs"}]
