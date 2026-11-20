@@ -1,13 +1,13 @@
 {
  "countries": {
   "NO": {
-   "generated": "2026-11-19T15:11:25Z",
-   "requests": 751,
-   "bytes": 8755645,
-   "seconds": 76,
+   "generated": "2026-11-20T09:11:27Z",
+   "requests": 762,
+   "bytes": 8726324,
+   "seconds": 185,
    "pub_pages": {
-    "fetched": 20,
-    "reused": 256
+    "fetched": 29,
+    "reused": 248
    }
   },
   "SE": {
@@ -63,20 +63,20 @@
  },
  "hosts": {
   "console.rpki-client.org": {
-   "requests": 144,
-   "bytes": 6065219
+   "requests": 153,
+   "bytes": 6035777
   },
   "raw.githubusercontent.com": {
    "requests": 1,
-   "bytes": 2368386
+   "bytes": 2368842
   },
   "stat.ripe.net": {
-   "requests": 5296,
-   "bytes": 2860606
+   "requests": 5298,
+   "bytes": 2860271
   }
  },
- "requests": 5441,
- "bytes": 11294211,
- "seconds": 865,
+ "requests": 5452,
+ "bytes": 11264890,
+ "seconds": 974,
  "complete": true
 }
