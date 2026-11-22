@@ -1,82 +1,82 @@
 {
  "countries": {
   "NO": {
-   "generated": "2026-11-21T14:08:44Z",
-   "requests": 758,
-   "bytes": 8458331,
-   "seconds": 113,
+   "generated": "2026-11-22T13:58:53Z",
+   "requests": 747,
+   "bytes": 8390477,
+   "seconds": 191,
    "pub_pages": {
-    "fetched": 26,
-    "reused": 251
+    "fetched": 13,
+    "reused": 264
    }
   },
   "SE": {
-   "generated": "2026-11-21T14:10:37Z",
-   "requests": 1598,
-   "bytes": 930930,
-   "seconds": 223,
+   "generated": "2026-11-22T14:02:04Z",
+   "requests": 1608,
+   "bytes": 937613,
+   "seconds": 208,
    "pub_pages": {
-    "fetched": 23,
-    "reused": 504
+    "fetched": 33,
+    "reused": 494
    }
   },
   "FI": {
-   "generated": "2026-11-21T14:14:20Z",
-   "requests": 693,
-   "bytes": 357717,
-   "seconds": 132,
+   "generated": "2026-11-22T14:05:32Z",
+   "requests": 687,
+   "bytes": 354532,
+   "seconds": 92,
    "pub_pages": {
-    "fetched": 20,
-    "reused": 189
+    "fetched": 14,
+    "reused": 195
    }
   },
   "DK": {
-   "generated": "2026-11-21T14:16:32Z",
-   "requests": 851,
-   "bytes": 442082,
-   "seconds": 185,
+   "generated": "2026-11-22T14:07:04Z",
+   "requests": 853,
+   "bytes": 444259,
+   "seconds": 98,
    "pub_pages": {
-    "fetched": 23,
-    "reused": 259
+    "fetched": 25,
+    "reused": 257
    }
   },
   "IS": {
-   "generated": "2026-11-21T14:19:37Z",
+   "generated": "2026-11-22T14:08:42Z",
    "requests": 167,
-   "bytes": 92442,
-   "seconds": 55,
+   "bytes": 93154,
+   "seconds": 26,
    "pub_pages": {
-    "fetched": 4,
-    "reused": 47
+    "fetched": 5,
+    "reused": 46
    }
   },
   "CZ": {
-   "generated": "2026-11-21T14:20:32Z",
-   "requests": 1366,
-   "bytes": 710770,
-   "seconds": 218,
+   "generated": "2026-11-22T14:09:08Z",
+   "requests": 1371,
+   "bytes": 713249,
+   "seconds": 244,
    "pub_pages": {
-    "fetched": 37,
-    "reused": 506
+    "fetched": 41,
+    "reused": 502
    }
   }
  },
  "hosts": {
   "console.rpki-client.org": {
-   "requests": 134,
-   "bytes": 5757365
+   "requests": 132,
+   "bytes": 5695091
   },
   "raw.githubusercontent.com": {
    "requests": 1,
-   "bytes": 2369121
+   "bytes": 2369302
   },
   "stat.ripe.net": {
-   "requests": 5298,
-   "bytes": 2865786
+   "requests": 5300,
+   "bytes": 2868891
   }
  },
  "requests": 5433,
- "bytes": 10992272,
- "seconds": 926,
+ "bytes": 10933284,
+ "seconds": 859,
  "complete": true
 }
