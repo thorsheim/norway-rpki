@@ -1,7 +1,7 @@
-# RPKI: ROA & ASPA posture, Nordics and Czech Republic
+# RPKI: ROA & ASPA posture in the Nordic and Baltic countries and the Czech Republic
 
 Public dashboards showing RPKI deployment for every ASN in Norway, Sweden, Finland,
-Denmark, Iceland and the Czech Republic: route-origin validity of every announcement, ROA quality (maxLength exposure,
+Denmark, Iceland, Estonia, Latvia, Lithuania and the Czech Republic: route-origin validity of every announcement, ROA quality (maxLength exposure,
 leftover ROAs) and ASPA records compared with observed upstreams.
 
 | Country | Dashboard | Data |
@@ -11,6 +11,9 @@ leftover ROAs) and ASPA records compared with observed upstreams.
 | Finland | https://rpki.thorsheim.net/fi/ | `docs/fi/data/` |
 | Denmark | https://rpki.thorsheim.net/dk/ | `docs/dk/data/` |
 | Iceland | https://rpki.thorsheim.net/is/ | `docs/is/data/` |
+| Estonia | https://rpki.thorsheim.net/ee/ | `docs/ee/data/` |
+| Latvia | https://rpki.thorsheim.net/lv/ | `docs/lv/data/` |
+| Lithuania | https://rpki.thorsheim.net/lt/ | `docs/lt/data/` |
 | Czech Republic | https://rpki.thorsheim.net/cz/ | `docs/cz/data/` |
 
 **Country overview:** https://rpki.thorsheim.net/overview/ (formerly /nordic/, which redirects) ranks the countries side by side
@@ -44,6 +47,8 @@ Every announcement is validated per RFC 6811 against every VRP worldwide.
   country's name, time zone, flag and the country switcher. Edit the template, not the copies.
 - `site/overview.html` is the country overview; `make_pages.py` writes it to `docs/overview/index.html`
   (plus a redirect at `docs/nordic/index.html`).
+- `scripts/countries.py` is the one list of countries (code, name, adjective, time zone) that
+  every script reads; to add a country, add it there and its flag in `make_pages.py`.
 - `scripts/daily_gate.py` decides which countries a run should build.
 - In each data folder: `history.json` keeps one row of headline figures per day,
   `changes_log.json` every run's changes for the last 30 days, `state.json` the per-ASN

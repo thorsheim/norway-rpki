@@ -14,6 +14,8 @@ import os
 import re
 import urllib.parse
 
+from countries import COUNTRIES as COUNTRY_LIST, data_dir, path
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -36,20 +38,34 @@ def flag_cz():
     return "data:image/svg+xml," + urllib.parse.quote(svg, safe="/:=' ")
 
 
-COUNTRIES = [  # order of the switcher
-    {"cc": "NO", "name": "Norway", "adj": "Norwegian", "tz": "Europe/Oslo", "path": "/", "dir": "docs",
-     "flag": flag("#ba0c2f", "#fff", 9, 5, 13.5, 5, inner=("#00205b", 10.25, 2.5, 14.75, 2.5))},
-    {"cc": "SE", "name": "Sweden", "adj": "Swedish", "tz": "Europe/Stockholm", "path": "/se/", "dir": "docs/se",
-     "flag": flag("#006aa7", "#fecc02", 9, 5, 13.5, 5)},
-    {"cc": "FI", "name": "Finland", "adj": "Finnish", "tz": "Europe/Helsinki", "path": "/fi/", "dir": "docs/fi",
-     "flag": flag("#fff", "#002f6c", 8.5, 6, 13, 6, border=True)},
-    {"cc": "DK", "name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen", "path": "/dk/", "dir": "docs/dk",
-     "flag": flag("#c8102e", "#fff", 9.5, 4, 14, 4)},
-    {"cc": "IS", "name": "Iceland", "adj": "Icelandic", "tz": "Atlantic/Reykjavik", "path": "/is/", "dir": "docs/is",
-     "flag": flag("#02529c", "#fff", 8.5, 6, 13, 6, inner=("#dc1e35", 10, 3, 14.5, 3))},
-    {"cc": "CZ", "name": "Czech Republic", "in": "the Czech Republic", "adj": "Czech", "tz": "Europe/Prague", "path": "/cz/",
-     "dir": "docs/cz", "flag": flag_cz()},
-]
+def tricolour(top, mid, bottom, stripes=(1, 1, 1), border=False):
+    """Horizontal striped flag (Estonia, Latvia, Lithuania); stripe heights in proportion."""
+    total, y, rects = sum(stripes), 0.0, ""
+    for colour, h in zip((top, mid, bottom), stripes):
+        hh = 32 * h / total
+        rects += f"<rect y='{y:.2f}' width='32' height='{hh + 0.05:.2f}' fill='{colour}'/>"
+        y += hh
+    svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><clipPath id='r'><rect width='32' height='32' rx='7'/></clipPath>"
+           f"<g clip-path='url(#r)'>{rects}</g>"
+           + ("<rect width='32' height='32' rx='7' fill='none' stroke='#c9c5bc' stroke-width='1.5'/>" if border else "") + "</svg>")
+    return "data:image/svg+xml," + urllib.parse.quote(svg, safe="/:=' ")
+
+
+FLAGS = {
+    "NO": flag("#ba0c2f", "#fff", 9, 5, 13.5, 5, inner=("#00205b", 10.25, 2.5, 14.75, 2.5)),
+    "SE": flag("#006aa7", "#fecc02", 9, 5, 13.5, 5),
+    "FI": flag("#fff", "#002f6c", 8.5, 6, 13, 6, border=True),
+    "DK": flag("#c8102e", "#fff", 9.5, 4, 14, 4),
+    "IS": flag("#02529c", "#fff", 8.5, 6, 13, 6, inner=("#dc1e35", 10, 3, 14.5, 3)),
+    "EE": tricolour("#0072ce", "#000", "#fff", border=True),
+    "LV": tricolour("#9e3039", "#fff", "#9e3039", stripes=(2, 1, 2)),
+    "LT": tricolour("#fdb913", "#006a44", "#c1272d"),
+    "CZ": flag_cz(),
+}
+
+# one entry per country, in switcher order, from scripts/countries.py
+COUNTRIES = [{"cc": cc, **c, "path": path(cc), "dir": data_dir(cc)[:-len("/data")], "flag": FLAGS[cc]}
+             for cc, c in COUNTRY_LIST.items()]
 
 
 OVERVIEW_ICON = "data:image/svg+xml," + urllib.parse.quote(

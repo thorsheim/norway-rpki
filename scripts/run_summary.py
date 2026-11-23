@@ -5,8 +5,9 @@ import json
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = {"NO": "docs/data", "SE": "docs/se/data", "FI": "docs/fi/data", "DK": "docs/dk/data",
-        "IS": "docs/is/data", "CZ": "docs/cz/data"}
+from countries import COUNTRIES, data_dir  # noqa: E402
+
+DATA = {cc: data_dir(cc) for cc in COUNTRIES}
 
 
 def main():

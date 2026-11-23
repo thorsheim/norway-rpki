@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the RPKI dashboard datasets for one country (NO, SE, FI, DK, IS or CZ).
+"""Build the RPKI dashboard datasets for one country (see scripts/countries.py).
 
 Collects:
   * every validated ROA and ASPA (rpki-client console, rpki.json, all five RIR trust anchors)
@@ -43,14 +43,7 @@ IPVERSE_ASINFO = "https://raw.githubusercontent.com/ipverse/asn-info/master/as.c
 MIN_PEERS = 10
 PUB_REFRESH_DAYS = 14
 
-COUNTRIES = {
-    "NO": {"name": "Norway", "adj": "Norwegian", "tz": "Europe/Oslo"},
-    "SE": {"name": "Sweden", "adj": "Swedish", "tz": "Europe/Stockholm"},
-    "FI": {"name": "Finland", "adj": "Finnish", "tz": "Europe/Helsinki"},
-    "DK": {"name": "Denmark", "adj": "Danish", "tz": "Europe/Copenhagen"},
-    "IS": {"name": "Iceland", "adj": "Icelandic", "tz": "Atlantic/Reykjavik"},
-    "CZ": {"name": "Czech Republic", "in": "the Czech Republic", "adj": "Czech", "tz": "Europe/Prague"},
-}
+from countries import COUNTRIES  # noqa: E402  (scripts/countries.py)
 CC = "NO"  # set from --country in main()
 C = COUNTRIES[CC]
 
