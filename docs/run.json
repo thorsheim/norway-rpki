@@ -1,82 +1,112 @@
 {
  "countries": {
   "NO": {
-   "generated": "2026-11-22T13:58:53Z",
-   "requests": 747,
-   "bytes": 8390477,
-   "seconds": 191,
+   "generated": "2026-11-23T16:19:10Z",
+   "requests": 753,
+   "bytes": 8725895,
+   "seconds": 239,
    "pub_pages": {
-    "fetched": 13,
-    "reused": 264
+    "fetched": 19,
+    "reused": 258
    }
   },
   "SE": {
-   "generated": "2026-11-22T14:02:04Z",
-   "requests": 1608,
-   "bytes": 937613,
-   "seconds": 208,
+   "generated": "2026-11-23T16:23:09Z",
+   "requests": 1624,
+   "bytes": 963209,
+   "seconds": 256,
    "pub_pages": {
-    "fetched": 33,
-    "reused": 494
+    "fetched": 49,
+    "reused": 477
    }
   },
   "FI": {
-   "generated": "2026-11-22T14:05:32Z",
-   "requests": 687,
-   "bytes": 354532,
-   "seconds": 92,
+   "generated": "2026-11-23T16:27:25Z",
+   "requests": 685,
+   "bytes": 353735,
+   "seconds": 85,
    "pub_pages": {
-    "fetched": 14,
-    "reused": 195
+    "fetched": 11,
+    "reused": 198
    }
   },
   "DK": {
-   "generated": "2026-11-22T14:07:04Z",
-   "requests": 853,
-   "bytes": 444259,
-   "seconds": 98,
+   "generated": "2026-11-23T16:28:51Z",
+   "requests": 848,
+   "bytes": 440751,
+   "seconds": 204,
    "pub_pages": {
-    "fetched": 25,
-    "reused": 257
+    "fetched": 20,
+    "reused": 262
    }
   },
   "IS": {
-   "generated": "2026-11-22T14:08:42Z",
-   "requests": 167,
-   "bytes": 93154,
-   "seconds": 26,
+   "generated": "2026-11-23T16:32:15Z",
+   "requests": 165,
+   "bytes": 92291,
+   "seconds": 48,
    "pub_pages": {
-    "fetched": 5,
-    "reused": 46
+    "fetched": 3,
+    "reused": 48
+   }
+  },
+  "EE": {
+   "generated": "2026-11-23T16:33:03Z",
+   "requests": 615,
+   "bytes": 327024,
+   "seconds": 85,
+   "pub_pages": {
+    "fetched": 182,
+    "reused": 0
+   }
+  },
+  "LV": {
+   "generated": "2026-11-23T16:34:28Z",
+   "requests": 849,
+   "bytes": 420624,
+   "seconds": 133,
+   "pub_pages": {
+    "fetched": 240,
+    "reused": 0
+   }
+  },
+  "LT": {
+   "generated": "2026-11-23T16:36:41Z",
+   "requests": 590,
+   "bytes": 459636,
+   "seconds": 105,
+   "pub_pages": {
+    "fetched": 171,
+    "reused": 0
    }
   },
   "CZ": {
-   "generated": "2026-11-22T14:09:08Z",
-   "requests": 1371,
-   "bytes": 713249,
-   "seconds": 244,
+   "generated": "2026-11-23T16:38:26Z",
+   "requests": 1374,
+   "bytes": 713548,
+   "seconds": 284,
    "pub_pages": {
-    "fetched": 41,
-    "reused": 502
+    "fetched": 46,
+    "reused": 497
    }
   }
  },
  "hosts": {
   "console.rpki-client.org": {
-   "requests": 132,
-   "bytes": 5695091
+   "requests": 742,
+   "bytes": 6457672
   },
   "raw.githubusercontent.com": {
    "requests": 1,
-   "bytes": 2369302
+   "bytes": 2369333
   },
   "stat.ripe.net": {
-   "requests": 5300,
-   "bytes": 2868891
+   "requests": 6760,
+   "bytes": 3669708
   }
  },
- "requests": 5433,
- "bytes": 10933284,
- "seconds": 859,
+ "requests": 7503,
+ "bytes": 12496713,
+ "seconds": 1439,
  "complete": true
 }
